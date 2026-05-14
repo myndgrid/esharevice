@@ -1,10 +1,14 @@
 # === SECRETS & CREDENTIALS ===
+# Ignore EVERY dotenv variant by default, then explicitly allow .env.example files.
 .env
-.env.local
-.env.development
-.env.staging
-.env.production
-.env.*.local
+.env.*
+**/.env
+**/.env.*
+*.creds
+*.secret
+*.secrets
+!.env.example
+!**/.env.example
 
 # Keys and certificates
 *.pem

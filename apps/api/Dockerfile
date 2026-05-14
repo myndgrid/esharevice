@@ -61,6 +61,9 @@ EXPOSE 8080
 HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=5 \
   CMD wget -qO- http://localhost:8080/health || exit 1
 
+# Run from apps/api so Node can resolve "tsx" (it's a dep of @esharevice/api,
+# symlinked at apps/api/node_modules/tsx — not at the workspace root).
+WORKDIR /repo/apps/api
 USER nodeapp
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["node", "--import", "tsx/esm", "apps/api/src/index.ts"]
+CMD ["node", "--import", "tsx/esm", "src/index.ts"]

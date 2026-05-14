@@ -669,6 +669,60 @@ Categories: `[Logic]` `[Null]` `[Memory]` `[Concurrency]` `[Type]` `[Network]` `
 
 ---
 
+### [Build] Docker Compose `$` Interpolation Breaks bcrypt / Connection Strings in .env Values
+**Description:** `docker compose` reads `.env` values and performs shell-style `$VAR` substitution on them. Any value containing literal `$` chars (bcrypt hashes like `$2a$14$...`, some JWT secrets, connection strings with passwords containing `$`) gets silently mangled — the substring after the second `$` is treated as a variable reference and resolves to empty, leaving the consumer container with a broken value. Compose emits a warning like `The "KNxoz..." variable is not set. Defaulting to a blank string.` but does NOT fail the deploy.
+**Avoid:** Escape every literal `$` as `$$` in `.env` lines that pass through to containers. Better: when generating bcrypt / similar with embedded `$`, run a `sed -i 's/\$/\$\$/g'` on that specific line. Best long-term: switch high-`$`-content secrets to file-based mounts (`docker compose` `secrets:`) which don't interpolate.
+
+---
+
+### [Build] Node ESM Cannot Resolve Workspace-Only Deps from a Different WORKDIR
+**Description:** In a pnpm workspace, a dependency declared in `apps/api/package.json` is symlinked at `apps/api/node_modules/<dep>` (pointing into the root `.pnpm` store) but NOT at `<root>/node_modules/<dep>`. Running `node --import <dep>/loader src/index.ts` from a different WORKDIR (e.g. `/repo`) fails with `Cannot find package '<dep>' imported from /repo/` because Node walks up looking for `node_modules/<dep>` and the symlink only lives one level deeper.
+**Avoid:** In Dockerfiles, `WORKDIR` to the package's own directory (`/repo/apps/api`) before `CMD`. Or hoist the dep to the workspace root via `pnpm add -w`. Easiest tell: `Cannot find package` errors that only manifest in production builds — local dev with `pnpm --filter` works because pnpm forks the right cwd.
+
+---
+
+### [Build] GitHub User-Owned Container Package Visibility is UI-Only
+**Description:** `PATCH /user/packages/container/{pkg}` returns 404 even with a PAT that has full `write:packages` + `delete:packages` + `repo` scopes. The same endpoint works for ORG-owned packages (`/orgs/{org}/packages/...`). User-owned package visibility can only be changed via the web UI at `https://github.com/users/<owner>/packages/container/<pkg>/settings`.
+**Avoid:** Don't promise CI/automation will flip package visibility for user-owned containers. Either keep them public (containers contain no secrets at rest), authenticate consumers via PAT (write into `~/.docker/config.json`), or migrate the project to an org. Hardcode the UI URL into deploy runbooks as a manual step rather than scripting it.
+
+---
+
+### [Build] IaC / Blueprint Tools Report `SUCCESS` on Parse Failure
+**Description:** Authentik, Terraform's `null_resource`, some Helm post-hooks, and other declarative tools log `Task finished SUCCESS` after parsing the input file — *before* validating individual entries against the target API. Individual entries can silently fail validation (e.g. "field X is required" on a serializer) while the overall task says "applied". The blueprint instance record stores `status: error` but the apply-task log line still says SUCCESS.
+**Avoid:** Never trust the wrapper task status alone. Always verify: (a) the BlueprintInstance / state record has `status: successful`, (b) the target objects actually exist via a list/search API after apply, and (c) when an apply seems to work but no resources show up, drop into the tool's validator (`Importer.validate()` for Authentik) to surface field-level errors.
+
+---
+
+### [Build] OAuth2 / OIDC Provider Models Require `redirect_uris` Even for `client_credentials` Flow
+**Description:** Authentik's `OAuth2Provider` serializer marks `redirect_uris` as required regardless of `client_type`. Even for confidential clients using `client_credentials` (no browser, no redirect), omitting the field fails validation with "This field is required". Other OIDC libraries do this too.
+**Avoid:** When a serializer field is required but semantically inapplicable, pass `[]`/`{}` explicitly. Don't omit. Same pattern applies to `scope` lists on machine-to-machine flows.
+
+---
+
+### [Type] IaC Tools Lack `${VAR}` Substitution — Hardcode or Use Tool-Specific Tags
+**Description:** Authentik blueprints, Kubernetes manifests, raw Terraform, and similar declarative YAML/HCL files do NOT perform shell-style `${VAR}` substitution by default. A literal `https://app.${DOMAIN}` is parsed as the string `https://app.${DOMAIN}`, which then fails downstream URL validation. The error appears as "Enter a valid URL" — not "unsubstituted variable" — making diagnosis annoying.
+**Avoid:** Use the tool's native templating: Authentik `!Env DOMAIN` or `!Context domain`, Helm `{{ .Values.domain }}`, Kustomize `vars`, envsubst preprocessing. Or hardcode the value in source control and accept the coupling. **Never** assume shell-style `${VAR}` works in YAML/JSON IaC.
+
+---
+
+### [Network] curl `-L` Downgrades POST to GET on Redirect
+**Description:** `curl -L` follows 301/302 redirects with GET regardless of the original method (RFC 7231 compliant default behavior). Calling `curl -L -X POST <url-with-redirect>` returns 405 Method Not Allowed because the server only accepts POST on the redirected URL. Authentik's API redirects every endpoint to its trailing-slash form, so this hits constantly.
+**Avoid:** Use `--post301 --post302 --post303` to preserve the method through redirects. Or pre-compute the canonical URL (add trailing slash) and skip `-L` entirely.
+
+---
+
+### [Environment] Outbound Transactional Email Requires Domain Verification BEFORE SMTP Works
+**Description:** Resend, Postmark, SendGrid, SES, Mailgun — every transactional email provider rejects sends from unverified sender domains. The SMTP credentials work (TLS handshake + AUTH succeed), the API key is valid, but the actual send returns a 403/550 with "domain not verified" until DKIM + SPF DNS records are in place AND the provider confirms them. Until then, password-reset emails silently fail. Authentik will log the failure but won't surface it on the password-reset flow.
+**Avoid:** In any deploy runbook that uses SMTP, the FIRST email-related step is "add the domain to provider, get DNS records, paste into authoritative DNS, click verify". Wiring SMTP credentials into env vars BEFORE this is wasted work — the env is correct but no email leaves.
+
+---
+
+### [Type] Cloudflare Global API Key — Legacy 37-Hex Format Has Been Replaced by `cfk_*`
+**Description:** Cloudflare's Global API Key used to be a 37-character hex string. As of late 2025 they've migrated to a `cfk_<50 chars>` prefixed format without widely updating docs. Authentication still uses `X-Auth-Email` + `X-Auth-Key` headers (NOT Bearer), but auth fails with "Unknown X-Auth-Key or X-Auth-Email" if you use the wrong email — and the legacy 37-hex format check is gone, so even the right key with the wrong email gives an unhelpful "Unknown" message.
+**Avoid:** When debugging Cloudflare API auth: (a) confirm the account-login email (not necessarily a developer-comms email), (b) use scoped API Tokens instead of the Global Key whenever possible — they use `Authorization: Bearer ...` and are clearly diagnosable as valid vs invalid via `GET /user/tokens/verify`, (c) the Global Key remains valuable mostly when scoped tokens can't reach an endpoint, but Cloudflare is actively deprecating it (cf. Origin CA Key deprecation banner in the dashboard).
+
+---
+
 ## Debugging Protocol
 
 > Before touching any code — **reproduce first, locate second, fix last.**
@@ -965,4 +1019,4 @@ node -e "const wtf = require('wtfnode'); setTimeout(wtf.dump, 5000);"
 
 ---
 
-*Last updated: 2026-05-11 | Global SWE Agent Config | Adapt the Architecture and Project Structure sections per project — everything else applies universally.*
+*Last updated: 2026-05-12 23:00 UTC | Global SWE Agent Config | Adapt the Architecture and Project Structure sections per project — everything else applies universally. Bug registry: 37 entries (+10 from the week-2 VPS provisioning session).*

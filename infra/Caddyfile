@@ -1,0 +1,93 @@
+# Caddy 2 — auto-TLS via Let's Encrypt, HTTP/3 by default.
+# Three public hosts in front of the Compose stack:
+#   app.{$DOMAIN}    -> web   (Next.js)
+#   api.{$DOMAIN}    -> api   (Express :8080)
+#   auth.{$DOMAIN}   -> authentik-server :9000 (HTTP) / :9443 (HTTPS)
+#
+# Plus internal-only hosts behind basic auth (uptime monitoring):
+#   uptime.{$DOMAIN} -> uptime-kuma :3001
+#
+# Caddy reads {$DOMAIN} and {$LETSENCRYPT_EMAIL} from the Compose env.
+
+{
+	email {$LETSENCRYPT_EMAIL}
+	# Production: uncomment to use Let's Encrypt prod.
+	# Staging  : leave the next line in to avoid hitting rate limits while iterating.
+	# acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+	servers {
+		protocols h1 h2 h3
+	}
+}
+
+# ─────────────────────────────────────────── Web (Next.js)
+app.{$DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		X-Content-Type-Options    "nosniff"
+		X-Frame-Options           "DENY"
+		Referrer-Policy           "strict-origin-when-cross-origin"
+		Permissions-Policy        "camera=(), microphone=(), geolocation=(self)"
+		-Server
+	}
+
+	reverse_proxy web:3000 {
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+}
+
+# ─────────────────────────────────────────── API (Express, versioned at /v1)
+api.{$DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		X-Content-Type-Options    "nosniff"
+		Referrer-Policy           "no-referrer"
+		-Server
+	}
+
+	# CORS preflight short-circuit (Caddy doesn't add CORS itself — the API does via the `cors` middleware).
+	reverse_proxy api:8080 {
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+}
+
+# ─────────────────────────────────────────── Authentik (identity provider)
+auth.{$DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		X-Content-Type-Options    "nosniff"
+		X-Frame-Options           "DENY"
+		Referrer-Policy           "no-referrer"
+		-Server
+	}
+
+	# Authentik listens on 9000 (HTTP) and 9443 (HTTPS). Use HTTP between Caddy and Authentik
+	# inside the docker network — TLS terminates at Caddy.
+	reverse_proxy authentik-server:9000 {
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+		header_up Host {host}
+	}
+}
+
+# ─────────────────────────────────────────── Uptime Kuma (internal — basic auth)
+# Generate the hash with: docker run --rm caddy:2-alpine caddy hash-password
+uptime.{$DOMAIN} {
+	basic_auth {
+		# Replace this hash via env or rebuild. Default user is `ops`.
+		ops {$UPTIME_BASIC_AUTH_HASH}
+	}
+	reverse_proxy uptime-kuma:3001
+}
+
+# ─────────────────────────────────────────── Healthcheck / fallthrough
+:80 {
+	respond "Caddy is up" 200
+}

@@ -1,0 +1,197 @@
+# Production stack for the Hetzner VPS.
+# Deploy via Coolify (Compose resource) or `docker compose -f infra/docker-compose.yml up -d`.
+# All secrets are read from `infra/.env` (gitignored). See infra/.env.example.
+
+name: esharevice
+
+networks:
+  edge:        # Caddy ↔ web/api/authentik
+  internal:    # services ↔ datastores (no internet)
+
+volumes:
+  postgres_data:
+  authentik_postgres_data:
+  redis_data:
+  authentik_media:
+  authentik_certs:
+  authentik_templates:
+  caddy_data:
+  caddy_config:
+  uptime_kuma_data:
+
+services:
+  # ─────────────────────────────────────────── App datastores
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-esharevice}
+      POSTGRES_USER: ${POSTGRES_USER:-esharevice}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-esharevice} -d $${POSTGRES_DB:-esharevice}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [internal]
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks: [internal]
+
+  # ─────────────────────────────────────────── Authentik (its own DB)
+  authentik-postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: authentik
+      POSTGRES_USER: authentik
+      POSTGRES_PASSWORD: ${AUTHENTIK_POSTGRES_PASSWORD:?required}
+    volumes:
+      - authentik_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U authentik -d authentik"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [internal]
+
+  authentik-server:
+    image: ghcr.io/goauthentik/server:2024.12
+    restart: unless-stopped
+    command: server
+    environment:
+      AUTHENTIK_REDIS__HOST: redis
+      AUTHENTIK_POSTGRESQL__HOST: authentik-postgres
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_POSTGRES_PASSWORD:?required}
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:?required}
+      AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
+      # Email (optional — wire when Resend/SMTP is provisioned)
+      AUTHENTIK_EMAIL__HOST: ${AUTHENTIK_EMAIL_HOST:-}
+      AUTHENTIK_EMAIL__PORT: ${AUTHENTIK_EMAIL_PORT:-587}
+      AUTHENTIK_EMAIL__USERNAME: ${AUTHENTIK_EMAIL_USERNAME:-}
+      AUTHENTIK_EMAIL__PASSWORD: ${AUTHENTIK_EMAIL_PASSWORD:-}
+      AUTHENTIK_EMAIL__USE_TLS: "true"
+      AUTHENTIK_EMAIL__FROM: ${AUTHENTIK_EMAIL_FROM:-noreply@${DOMAIN:?required}}
+    volumes:
+      - authentik_media:/media
+      - authentik_certs:/certs
+      - authentik_templates:/templates
+      - ./authentik/blueprints:/blueprints/custom:ro
+    depends_on:
+      authentik-postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "ak", "healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks: [internal, edge]
+
+  authentik-worker:
+    image: ghcr.io/goauthentik/server:2024.12
+    restart: unless-stopped
+    command: worker
+    environment:
+      AUTHENTIK_REDIS__HOST: redis
+      AUTHENTIK_POSTGRESQL__HOST: authentik-postgres
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_POSTGRES_PASSWORD:?required}
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:?required}
+    volumes:
+      - authentik_media:/media
+      - authentik_certs:/certs
+      - authentik_templates:/templates
+      - ./authentik/blueprints:/blueprints/custom:ro
+    depends_on:
+      authentik-postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    networks: [internal]
+
+  # ─────────────────────────────────────────── App services
+  api:
+    image: ghcr.io/${GHCR_OWNER:?required}/esharevice-api:${API_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      API_PORT: 8080
+      API_PUBLIC_URL: https://api.${DOMAIN:?required}
+      WEB_ORIGIN: https://app.${DOMAIN}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-esharevice}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-esharevice}
+      REDIS_URL: redis://redis:6379
+      OIDC_ISSUER: https://auth.${DOMAIN}/application/o/e-sharevice-web/
+      OIDC_AUDIENCE: e-sharevice-web
+      OIDC_JWKS_URL: https://auth.${DOMAIN}/application/o/e-sharevice-web/jwks/
+      SENTRY_DSN: ${SENTRY_DSN_API:-}
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks: [internal, edge]
+
+  web:
+    image: ghcr.io/${GHCR_OWNER:?required}/esharevice-web:${WEB_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      WEB_PORT: 3000
+      NEXT_PUBLIC_API_URL: https://api.${DOMAIN:?required}
+      OIDC_ISSUER: https://auth.${DOMAIN}/application/o/e-sharevice-web/
+      OIDC_CLIENT_ID: e-sharevice-web
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:?required}
+      OIDC_REDIRECT_URI: https://app.${DOMAIN}/api/auth/callback
+      SESSION_COOKIE_SECRET: ${SESSION_COOKIE_SECRET:?required}
+      SENTRY_DSN: ${SENTRY_DSN_WEB:-}
+    depends_on:
+      api: { condition: service_healthy }
+    networks: [edge]
+
+  # ─────────────────────────────────────────── Edge
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"      # HTTP/3
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      DOMAIN: ${DOMAIN:?required}
+      LETSENCRYPT_EMAIL: ${LETSENCRYPT_EMAIL:?required}
+    depends_on:
+      - web
+      - api
+      - authentik-server
+    networks: [edge]
+
+  # ─────────────────────────────────────────── Monitoring
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    restart: unless-stopped
+    volumes:
+      - uptime_kuma_data:/app/data
+    networks: [edge]

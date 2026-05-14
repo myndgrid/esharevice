@@ -1,0 +1,42 @@
+# Local dev stack — minimal datastores only.
+# Web (Next.js) and API (Express) run on the host via `pnpm dev`, hitting these ports directly.
+# Authentik can be added locally later; for week 1–4 dev, the API auth middleware is a no-op stub.
+
+name: esharevice-dev
+
+volumes:
+  postgres_data_dev:
+  redis_data_dev:
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: esharevice
+      POSTGRES_USER: esharevice
+      POSTGRES_PASSWORD: esharevice
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+      - ../infra/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U esharevice -d esharevice"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data_dev:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5

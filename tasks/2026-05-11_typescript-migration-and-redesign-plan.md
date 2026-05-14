@@ -1003,6 +1003,23 @@ These are isolated, reversible, low-risk fixes that don't require the new stack:
 ### 2026-05-11 00:00 UTC
 - Plan drafted; saved for user review. No code changes yet.
 
+### 2026-05-12 04:30 UTC
+- **Week 2 infra-as-code landed** (the VPS itself is not yet provisioned — that step is a human task documented in [`tasks/2026-05-12_vps-provisioning-runbook.md`](2026-05-12_vps-provisioning-runbook.md)).
+- Files added:
+  - `infra/docker-compose.yml` — full production stack: postgres, redis, authentik-postgres (dedicated), authentik-server, authentik-worker, api, web, caddy, uptime-kuma. Two networks (`edge`, `internal`); secrets injected via `infra/.env`.
+  - `infra/docker-compose.dev.yml` — minimal local stack (postgres + redis only). Web/API run on the host via `pnpm dev` against these.
+  - `infra/Caddyfile` — auto-TLS for `app.`, `api.`, `auth.`, `uptime.` subdomains; HTTP/3 on; HSTS preload; per-route security headers; basic auth on the Kuma host.
+  - `infra/.env.example` — every required secret with placeholder + comment.
+  - `infra/postgres/init/01-extensions.sql` — runs `CREATE EXTENSION citext, pgcrypto` on first DB init.
+  - `infra/authentik/blueprints/esharevice.yaml` — declarative Authentik bootstrap: signing key + the three OAuth2 providers (web confidential w/ PKCE, mobile public w/ PKCE, partners confidential) and their Applications + `esharevice-users` group. Social OAuth (Google/GitHub) configured via admin UI post-boot.
+  - `infra/scripts/backup.sh` — daily `pg_dump` of both databases, gzip + age-encrypt + rclone to Backblaze B2; 30-day retention.
+  - `infra/scripts/restore-drill.sh` — pulls latest dump from B2, restores into a throwaway Postgres container, asserts row counts. Fails loudly. Cron'd quarterly.
+  - `apps/web/Dockerfile` — multi-stage Next.js 15 standalone build (corepack + pnpm caches; non-root user; ~150 MB final image).
+  - `apps/api/Dockerfile` — multi-stage Express + tsx runtime; typecheck gate in the build; pruned production install; tini as PID 1; healthcheck wired.
+  - `.dockerignore` — excludes `node_modules`, `.next`, `.turbo`, `.env*`, `Repo/`, `tasks/`.
+- The VPS runbook (12 steps, ~90 min start-to-finish) covers: Hetzner provisioning, DNS records, OS hardening (sshd, ufw, fail2ban, unattended-upgrades), Docker install, Coolify install (optional), repo clone + secret generation, stack boot order, Authentik first-boot config, image build + push to ghcr.io, Drizzle migration apply, monitoring wiring (Kuma + Sentry), backup scheduling, and acceptance checks.
+- Legacy `Repo/` directory remains untouched; verified via `git check-ignore` and clean working tree on both legacy subprojects.
+
 ### 2026-05-12 03:00 UTC
 - **Week 1 foundation landed.** Monorepo scaffolded at the workspace root, parallel to (and isolated from) the legacy `Repo/` directory which is gitignored and untouched.
 - Files created (39 total):

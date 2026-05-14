@@ -19,6 +19,13 @@
 	}
 }
 
+# ─────────────────────────────────────────── Bare domain + www → app (301 redirect)
+{$DOMAIN}, www.{$DOMAIN} {
+	encode zstd gzip
+	header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+	redir https://app.{$DOMAIN}{uri} 301
+}
+
 # ─────────────────────────────────────────── Web (Next.js)
 app.{$DOMAIN} {
 	encode zstd gzip

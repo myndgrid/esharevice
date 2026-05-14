@@ -30,6 +30,7 @@ COPY . .
 RUN pnpm --filter @esharevice/api typecheck
 
 # ── 4. Prune to production install (drops devDependencies) ─
+# tsx is in apps/api dependencies (not devDependencies) so --prod keeps it.
 FROM base AS prune
 WORKDIR /repo
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
@@ -38,9 +39,6 @@ COPY packages/shared/package.json ./packages/shared/
 COPY packages/db/package.json ./packages/db/
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile --prod
-# tsx is needed at runtime — keep it as a "production runtime" dep by re-adding it.
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm --filter @esharevice/api add tsx@^4.19.2
 
 # ── 5. Runtime ─────────────────────────────────────────────
 FROM node:20.10-alpine AS runner

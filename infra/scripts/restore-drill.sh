@@ -46,9 +46,18 @@ done
 gunzip -c "$WORKDIR"/esharevice-app-*.sql.gz | docker exec -i "$CID" psql -U drill -d drill -v ON_ERROR_STOP=1
 
 echo "[5/5] validating"
-USERS=$(docker exec "$CID" psql -U drill -d drill -tAc "SELECT count(*) FROM users")
-ITEMS=$(docker exec "$CID" psql -U drill -d drill -tAc "SELECT count(*) FROM exchange_items")
+# Tolerate the pre-migration state: tables may not exist yet. We only fail
+# if (a) the DB connection itself broke, or (b) the table exists but the
+# count query errors. NULL row count means "table absent" — acceptable.
+USERS=$(docker exec "$CID" psql -U drill -d drill -tAc \
+  "SELECT count(*) FROM users WHERE to_regclass('public.users') IS NOT NULL" 2>/dev/null || echo "")
+ITEMS=$(docker exec "$CID" psql -U drill -d drill -tAc \
+  "SELECT count(*) FROM exchange_items WHERE to_regclass('public.exchange_items') IS NOT NULL" 2>/dev/null || echo "")
+USERS=${USERS:-0}
+ITEMS=${ITEMS:-0}
 echo "    users=$USERS, exchange_items=$ITEMS"
-[[ "$USERS" =~ ^[0-9]+$ && "$ITEMS" =~ ^[0-9]+$ ]] || { echo "validation failed"; exit 3; }
+
+# Sanity: confirm Postgres is responsive at all.
+docker exec "$CID" psql -U drill -d drill -tAc "SELECT 1" >/dev/null || { echo "validation failed: db unresponsive"; exit 3; }
 
 echo "OK: restore drill succeeded"

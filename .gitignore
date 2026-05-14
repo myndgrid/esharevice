@@ -1,0 +1,64 @@
+# === SECRETS & CREDENTIALS ===
+.env
+.env.local
+.env.development
+.env.staging
+.env.production
+.env.*.local
+
+# Keys and certificates
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+
+# Token files
+tokens/
+*.token.json
+
+# === RUNTIME / BUILD ===
+node_modules/
+.pnpm-store/
+.pnpm-debug.log*
+dist/
+build/
+.next/
+.turbo/
+.cache/
+.vite/
+*.tsbuildinfo
+
+# === LOGS & OUTPUT ===
+logs/
+*.log
+output/
+tmp/
+coverage/
+
+# === OS & IDE ===
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.suo
+*.sw?
+*.swp
+
+# === DATABASE / GENERATED ===
+*.sqlite
+*.sqlite-journal
+drizzle/*.snapshot.json
+drizzle/migrations.json
+
+# === MISC ===
+*.tmp
+*.temp
+*.zip
+*.tar.gz
+
+# === REFERENCE-ONLY DIRECTORY ===
+# Repo/ contains the legacy JS apps. It is kept for reference but is NOT part of the monorepo.
+# Comment the next line out if you ever want to vendor these into the workspace.
+Repo/

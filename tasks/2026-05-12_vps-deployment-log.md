@@ -1,8 +1,8 @@
 # VPS Deployment Log — e-Sharevice (esharevice.com on Hostinger)
 
 **Created:** 2026-05-12 22:00 UTC
-**Last Updated:** 2026-05-12 22:30 UTC
-**Status:** Stack live; Authentik admin + OIDC client secret pending user action
+**Last Updated:** 2026-05-12 22:20 UTC
+**Status:** Stack live; Authentik fully provisioned; OIDC client secret wired
 
 The runbook's prerequisites were sourced from `tasks/.env.creds` (gitignored). The user opted for the "fast path" (option B in the kickoff exchange): use the master credentials once for setup, rotate after. **All four credentials below MUST be rotated** before this is treated as production.
 
@@ -53,6 +53,16 @@ The runbook's prerequisites were sourced from `tasks/.env.creds` (gitignored). T
 7. **Caddy `header_up X-Forwarded-Proto {scheme}` deprecated** — Caddy 2 sets these by default. Removed the explicit lines.
 8. **Restore drill failed on empty pre-migration DB** (`relation "users" does not exist`). Fix: wrap row counts with `WHERE to_regclass('public.users') IS NOT NULL`. The drill now tolerates the pre-migration state, while still failing loudly on actual decrypt/restore errors.
 
+9. **Authentik blueprint silent failures.** Authentik's worker logged `Task finished SUCCESS` for the blueprint apply but the Providers / Applications UI was empty. Three sequential bugs in our `infra/authentik/blueprints/esharevice.yaml`, each surfaced one at a time by running `Importer.validate()` inside the container:
+   - **Bug 9a**: `CertificateKeyPair` cannot be created from a blueprint alone — it needs PEM `certificate_data`. Fix: drop the entry that tried to create `esharevice-jwt` and reference Authentik's built-in `"authentik Self-signed Certificate"` instead.
+   - **Bug 9b**: `meta_launch_url: 'https://app.${DOMAIN}'` failed URL validation. Authentik blueprints don't do docker-compose-style `${VAR}` substitution. Fix: hardcode `esharevice.com`. (Authentik does support `!Env` / `!Context` tags for templating; deferred until needed.)
+   - **Bug 9c**: The partners OAuth2 provider (client_credentials flow) failed with `redirect_uris: This field is required` even though that flow doesn't redirect. Fix: add explicit `redirect_uris: []`.
+   - After all three fixes + `POST /api/v3/managed/blueprints/{pk}/apply/`, the blueprint applied cleanly: 3 OAuth2 providers + 3 Applications + 1 group (`esharevice-users`) all created. OIDC discovery now serves at `https://auth.esharevice.com/application/o/e-sharevice-web/.well-known/openid-configuration`.
+
+10. **Curl `-L` downgrades POST to GET on redirect.** When triggering the blueprint apply via API, Authentik's URL routing 301-redirects (no trailing slash → trailing slash), and curl's default behavior is to re-issue as GET — which returns 405 Method Not Allowed. Fix: pass `--post301 --post302`.
+
+11. **Authentik API JSON has embedded control chars** (icon SVG bytes for default blueprints), making strict `json.loads` choke. Fix: parse with `strict=False`.
+
 ---
 
 ## What still needs you (post-deploy)
@@ -73,11 +83,12 @@ The runbook's prerequisites were sourced from `tasks/.env.creds` (gitignored). T
 
 ### Outstanding actions
 
-- [ ] **Authentik initial admin setup** at https://auth.esharevice.com/if/flow/initial-setup/ (3 min). Set the `akadmin` password.
-- [ ] After admin exists, the OIDC client secret for `e-sharevice-web` needs to be copied from Authentik admin UI (Applications → Providers → e-sharevice-web → Edit → Client Secret) into `infra/.env` as `OIDC_CLIENT_SECRET=`. Currently the placeholder `PENDING_AUTHENTIK_BOOT` is set, which means the web app can boot but no login will succeed yet.
+- [x] ~~**Authentik initial admin setup**~~ — done. `akadmin` user exists.
+- [x] ~~**OIDC client secret wired**~~ — done. `OIDC_CLIENT_SECRET` in `infra/.env` reflects the value generated for the `e-sharevice-web` OAuth2 provider; web container restarted.
 - [ ] Configure social OAuth (Google + GitHub) in Authentik admin UI: Directory → Federation & Social Login. Paste the redirect URIs Authentik gives you into Google/GitHub OAuth app settings.
 - [ ] Apple Sign-In: deferred until the iOS app exists (Apple Developer account required).
 - [ ] Sentry SDKs not yet wired into application code — the env DSNs are set, but `Sentry.init()` calls land alongside the real `apps/api` and `apps/web` feature code in weeks 3-7. Until then, no errors flow to Sentry.
+- [ ] OIDC client implementation in `apps/web` (`oauth4webapi` + four route handlers under `app/api/auth/`) is a week 5 task. Until then, the env vars are set but no login flow exists in the web app yet.
 
 ---
 
@@ -119,6 +130,13 @@ Internal docker network (no internet egress for datastores):
 ---
 
 ## Progress Log
+
+### 2026-05-12 22:20 UTC
+- Authentik fully provisioned: `akadmin` set up, three OAuth2 providers (web/mobile/partners) + three Applications + `esharevice-users` group all created via blueprint.
+- OIDC discovery endpoint confirmed live and serving valid metadata.
+- `OIDC_CLIENT_SECRET` for `e-sharevice-web` (auto-generated by Authentik) written into `infra/.env`; web container restarted to pick it up.
+- Three blueprint bugs surfaced and fixed (see issues 9a-c in the bug log above). The blueprint is now idempotent.
+- Web app code does not yet implement OIDC login — that's a week-5 deliverable (`oauth4webapi` + auth route handlers). For now, the env is fully wired and discovery works end-to-end.
 
 ### 2026-05-12 22:00 UTC
 - Stack fully provisioned. 9 of 11 todo items complete; remaining 2 (Authentik admin + OIDC client secret wiring) require user.

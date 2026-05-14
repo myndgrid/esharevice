@@ -1,8 +1,8 @@
 # Task: TypeScript Migration & Frontend Redesign Plan
 
 **Created:** 2026-05-11 00:00 UTC
-**Last Updated:** 2026-05-12 02:00 UTC
-**Status:** v3.1 — open questions resolved; ready to start week 1
+**Last Updated:** 2026-05-12 22:45 UTC
+**Status:** v3.2 — weeks 1 + 2 shipped; production stack live at esharevice.com
 
 ---
 
@@ -1002,6 +1002,17 @@ These are isolated, reversible, low-risk fixes that don't require the new stack:
 
 ### 2026-05-11 00:00 UTC
 - Plan drafted; saved for user review. No code changes yet.
+
+### 2026-05-12 22:45 UTC
+- **VPS deploy complete — week 2 fully delivered on the real Hetzner box (`2.24.195.151`, esharevice.com).**
+- Stack live: api, web, postgres (×2), redis, authentik-server, authentik-worker, caddy, uptime-kuma — all healthy. 5 Let's Encrypt certs issued. OIDC discovery serving real metadata at `https://auth.esharevice.com/application/o/e-sharevice-web/.well-known/openid-configuration`.
+- Authentik configured: `akadmin` user created; blueprint debugged (3 fixes: uncreatable cert keypair → reference built-in self-signed; `${DOMAIN}` doesn't substitute → hardcode; client_credentials requires `redirect_uris: []`); 3 OAuth2 providers + 3 Applications + 1 group materialised; web provider's auto-generated client secret wired into `infra/.env`.
+- Sentry projects created (`esharevice-api`, `esharevice-web`); DSNs in env (SDK init lands week 5).
+- Backups: daily pg_dump → age-encrypt → Backblaze B2 cron at 03:00 UTC; quarterly restore drill scheduled. First backup + restore drill both green.
+- VPS docker authenticated to ghcr.io via PAT (config in `/home/ops/.docker/config.json`); supports public or private packages.
+- Resend SMTP env wired into Authentik; `esharevice.com` still needs domain verification at resend.com/domains before emails actually flow.
+- 18 commits total this session; full state captured in [tasks/2026-05-12_vps-deployment-log.md](2026-05-12_vps-deployment-log.md) with 13 logged bug/gotcha entries.
+- Week 2 done. Ready for week 3 (typed backend core, Drizzle migrations, OIDC JWT verifier middleware, `/v1` route stubs, OpenAPI from Zod).
 
 ### 2026-05-12 04:30 UTC
 - **Week 2 infra-as-code landed** (the VPS itself is not yet provisioned — that step is a human task documented in [`tasks/2026-05-12_vps-provisioning-runbook.md`](2026-05-12_vps-provisioning-runbook.md)).

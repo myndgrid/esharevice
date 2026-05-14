@@ -1,8 +1,8 @@
 # VPS Deployment Log — e-Sharevice (esharevice.com on Hostinger)
 
 **Created:** 2026-05-12 22:00 UTC
-**Last Updated:** 2026-05-12 22:20 UTC
-**Status:** Stack live; Authentik fully provisioned; OIDC client secret wired
+**Last Updated:** 2026-05-12 22:45 UTC
+**Status:** Stack live; Authentik fully provisioned; OIDC + Resend SMTP wired; GHCR private-capable
 
 The runbook's prerequisites were sourced from `tasks/.env.creds` (gitignored). The user opted for the "fast path" (option B in the kickoff exchange): use the master credentials once for setup, rotate after. **All four credentials below MUST be rotated** before this is treated as production.
 
@@ -63,6 +63,13 @@ The runbook's prerequisites were sourced from `tasks/.env.creds` (gitignored). T
 
 11. **Authentik API JSON has embedded control chars** (icon SVG bytes for default blueprints), making strict `json.loads` choke. Fix: parse with `strict=False`.
 
+12. **GHCR private-package flip is UI-only for user-owned packages.** A new GitHub PAT with full `write:packages` / `delete:packages` / `repo` scopes still returns 404 on `PATCH /user/packages/container/{pkg}`. The endpoint exists for org packages but not user packages — confirmed via direct API probing. Two viable paths:
+   - Keep packages public (images contain no secrets at rest — secrets land via env from `infra/.env` at run time; the same code is already in a public repo). Zero work.
+   - Click each package's settings page in the UI and flip visibility manually.
+   Either way, the VPS is now authenticated to ghcr.io via the new PAT, so private images work the moment the user flips them. Credentials live at `/home/ops/.docker/config.json` on the VPS (root readable, ops readable). Docker prints a warning about unencrypted credentials; that's fine for a single-node deploy. A credential helper (pass / secretservice) can be wired later.
+
+13. **Resend domain verification.** The send-only API key is properly scoped and works for SMTP, but `esharevice.com` must be verified in Resend before outbound emails go through (we got a 403 `validation_error` on the first send-test). User needs to add the domain in resend.com/domains, paste the DKIM/SPF/MX records into chat, and I'll add them to Cloudflare DNS via API. The SMTP credentials in `infra/.env` are already wired; emails start flowing the instant the domain verifies.
+
 ---
 
 ## What still needs you (post-deploy)
@@ -89,6 +96,8 @@ The runbook's prerequisites were sourced from `tasks/.env.creds` (gitignored). T
 - [ ] Apple Sign-In: deferred until the iOS app exists (Apple Developer account required).
 - [ ] Sentry SDKs not yet wired into application code — the env DSNs are set, but `Sentry.init()` calls land alongside the real `apps/api` and `apps/web` feature code in weeks 3-7. Until then, no errors flow to Sentry.
 - [ ] OIDC client implementation in `apps/web` (`oauth4webapi` + four route handlers under `app/api/auth/`) is a week 5 task. Until then, the env vars are set but no login flow exists in the web app yet.
+- [ ] **Verify `esharevice.com` in Resend** at https://resend.com/domains so password-reset / signup-verification emails actually leave Authentik. Paste the DNS records here and I'll add them via the Cloudflare API.
+- [ ] (Optional) flip both GHCR packages to private — the VPS docker is already authenticated, so pulls keep working either way. Both URLs are in the bug log above (item 12).
 
 ---
 
@@ -130,6 +139,12 @@ Internal docker network (no internet egress for datastores):
 ---
 
 ## Progress Log
+
+### 2026-05-12 22:45 UTC
+- VPS docker authenticated to ghcr.io with a fresh GitHub PAT (`/home/ops/.docker/config.json`). Both `esharevice-{api,web}:latest` pull successfully.
+- Investigated the GHCR visibility-flip API again with the new PAT (full `write:packages` + `delete:packages` + `repo`) — confirmed 404 on `PATCH /user/packages/container/{pkg}`. The endpoint is genuinely org-only for user-owned packages. UI flip is the only path; the VPS works either way.
+- Resend SMTP credentials wired into `infra/.env` on the VPS (`AUTHENTIK_EMAIL_HOST/PORT/USERNAME/PASSWORD/FROM`); Authentik server + worker restarted. Confirmed both come back healthy.
+- Send-test against the Resend API failed with `domain not verified` — the SMTP path will reject sends until the user adds DKIM/SPF DNS records and clicks Verify in resend.com/domains. Logged in outstanding actions.
 
 ### 2026-05-12 22:20 UTC
 - Authentik fully provisioned: `akadmin` set up, three OAuth2 providers (web/mobile/partners) + three Applications + `esharevice-users` group all created via blueprint.

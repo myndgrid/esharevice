@@ -201,12 +201,47 @@ The `api` and `web` services will fail to start until images are pushed — that
 
 ## 8. Configure Authentik (15 min)
 
-1. Open `https://auth.your-domain.com`.
-2. First-boot setup wizard: create the `akadmin` user and set its password (save to your password manager).
-3. Apply the e-Sharevice blueprint: **Customisation → Blueprints**, find `esharevice.yaml` (auto-loaded from `/blueprints/custom/`), click **Apply** if it isn't already.
-4. **Applications → Providers → e-sharevice-web → Edit**. Copy the auto-generated **Client Secret**. Paste into `infra/.env` as `OIDC_CLIENT_SECRET=...`, then `docker compose up -d web` to restart with the value.
-5. **Directory → Federation & Social Login → Create**. Add **Google** and **GitHub** providers; the redirect URI Authentik shows is what you paste into Google / GitHub OAuth app settings.
+1. Open `https://auth.your-domain.com/if/flow/initial-setup/` and set the `akadmin` password (save to your password manager).
+2. Apply the e-Sharevice blueprint via **Customisation → Blueprints** (mounted from `/blueprints/custom/esharevice.yaml`). If it shows `status: error`, copy the blueprint instance UUID and either retry from the UI's three-dot menu or POST the apply endpoint:
+
+   ```bash
+   AK_TOKEN=<admin-token-from-Directory-Tokens-and-App-Passwords>
+   curl --post301 --post302 -X POST \
+     "https://auth.your-domain.com/api/v3/managed/blueprints/$INSTANCE_PK/apply/" \
+     -H "Authorization: Bearer $AK_TOKEN" -H "Content-Length: 0"
+   ```
+
+   The reference blueprint already accounts for three subtleties Authentik enforces but doesn't document well:
+   - Cannot create `CertificateKeyPair` from a blueprint (needs PEM `certificate_data`). Reference the built-in `"authentik Self-signed Certificate"`.
+   - No `${VAR}` substitution in YAML literals; hardcode hostnames or use `!Env`/`!Context` tags.
+   - `OAuth2Provider.redirect_uris` is required even for client_credentials clients — use `[]`.
+
+3. **Applications → Providers → e-sharevice-web → Edit**. Copy the auto-generated **Client Secret**. Paste into `infra/.env` as `OIDC_CLIENT_SECRET=...`, then `docker compose up -d web` to restart with the value.
+4. **Directory → Federation & Social Login → Create**. Add **Google** and **GitHub** providers; the redirect URI Authentik shows is what you paste into Google / GitHub OAuth app settings.
+5. **Wire SMTP** (see step 8.5 below for the Resend dance) so password-reset and signup-verification emails leave Authentik.
 6. Verify each social login by opening `https://auth.your-domain.com/if/flow/default-authentication-flow/` in a private window — both Google and GitHub buttons should appear.
+
+### 8.5. Resend SMTP for Authentik emails (~5 min, but +DNS-propagation wait)
+
+Without verified outbound email, Authentik can't send password resets, signup verifications, or admin alerts. Resend is the cleanest option for a small Hetzner deploy (free 3k/mo, clean React-email templating, transactional only — won't bounce-rate-tank your domain).
+
+1. Resend account → https://resend.com/api-keys → **Create** a *send-only* API key (`emails:send`). Save to your password manager.
+2. Resend dashboard → https://resend.com/domains → **Add Domain** → `your-domain.com`. Copy the 4 records Resend shows (MX, SPF TXT, DKIM TXT — sometimes 2 DKIM records, and an optional DMARC TXT).
+3. Add the records to Cloudflare DNS (via dashboard or API). Wait 1-2 min for propagation, then click **Verify** in Resend.
+4. Drop SMTP credentials into `infra/.env` on the VPS:
+
+   ```bash
+   sed -i \
+     -e 's|^AUTHENTIK_EMAIL_HOST=.*|AUTHENTIK_EMAIL_HOST=smtp.resend.com|' \
+     -e 's|^AUTHENTIK_EMAIL_PORT=.*|AUTHENTIK_EMAIL_PORT=587|' \
+     -e 's|^AUTHENTIK_EMAIL_USERNAME=.*|AUTHENTIK_EMAIL_USERNAME=resend|' \
+     -e "s|^AUTHENTIK_EMAIL_PASSWORD=.*|AUTHENTIK_EMAIL_PASSWORD=$RESEND_KEY|" \
+     -e 's|^AUTHENTIK_EMAIL_FROM=.*|AUTHENTIK_EMAIL_FROM=noreply@your-domain.com|' \
+     /opt/esharevice/infra/.env
+   docker compose -f /opt/esharevice/infra/docker-compose.yml restart authentik-server authentik-worker
+   ```
+
+5. Test from the Authentik admin UI: **System → Settings → Test Email Configuration**.
 
 > Apple Sign-In is deferred until the mobile app phase (per plan v3.1).
 
@@ -230,7 +265,15 @@ docker buildx build --platform linux/amd64 \
   -f apps/web/Dockerfile --push .
 ```
 
-Make the packages **public** in GitHub (or configure the VPS with a deploy key) so `docker compose pull` on the VPS can fetch them.
+Either make the packages public in GitHub, **or** authenticate the VPS to ghcr.io with a PAT. Note: changing visibility on user-owned container packages is UI-only (`PATCH /user/packages/container/{pkg}` 404s even with full scopes) — for each package, visit `https://github.com/users/<OWNER>/packages/container/<pkg>/settings` → Danger Zone → Change visibility.
+
+**To use private images (recommended):** create a fine-grained PAT at https://github.com/settings/tokens with `read:packages` scope (or just reuse a classic PAT with `repo`+`read:packages`), then on the VPS:
+
+```bash
+echo "$GHCR_PAT" | docker login ghcr.io -u <OWNER> --password-stdin
+# Credentials are stored in /home/ops/.docker/config.json (base64, not encrypted).
+# Acceptable for a single-node deploy; wire `pass` or `secretservice` if you want a helper.
+```
 
 Back on the VPS:
 

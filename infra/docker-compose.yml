@@ -182,6 +182,7 @@ services:
     environment:
       DOMAIN: ${DOMAIN:?required}
       LETSENCRYPT_EMAIL: ${LETSENCRYPT_EMAIL:?required}
+      UPTIME_BASIC_AUTH_HASH: ${UPTIME_BASIC_AUTH_HASH:?required}
     depends_on:
       - web
       - api

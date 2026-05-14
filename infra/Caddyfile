@@ -41,7 +41,6 @@ app.{$DOMAIN} {
 
 	reverse_proxy web:3000 {
 		header_up X-Real-IP {remote_host}
-		header_up X-Forwarded-Proto {scheme}
 	}
 }
 
@@ -59,7 +58,6 @@ api.{$DOMAIN} {
 	# CORS preflight short-circuit (Caddy doesn't add CORS itself — the API does via the `cors` middleware).
 	reverse_proxy api:8080 {
 		header_up X-Real-IP {remote_host}
-		header_up X-Forwarded-Proto {scheme}
 	}
 }
 
@@ -79,7 +77,6 @@ auth.{$DOMAIN} {
 	# inside the docker network — TLS terminates at Caddy.
 	reverse_proxy authentik-server:9000 {
 		header_up X-Real-IP {remote_host}
-		header_up X-Forwarded-Proto {scheme}
 		header_up Host {host}
 	}
 }

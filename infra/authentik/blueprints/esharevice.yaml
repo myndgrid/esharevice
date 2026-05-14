@@ -55,7 +55,7 @@ entries:
         - !Find [authentik_providers_oauth2.scopemapping, [scope_name, email]]
       redirect_uris:
         - matching_mode: strict
-          url: https://app.${DOMAIN}/api/auth/callback
+          url: https://app.esharevice.com/api/auth/callback
         - matching_mode: strict
           url: http://localhost:3000/api/auth/callback
 
@@ -65,7 +65,7 @@ entries:
     attrs:
       name: e-Sharevice (Web)
       provider: !Find [authentik_providers_oauth2.oauth2provider, [name, e-sharevice-web]]
-      meta_launch_url: https://app.${DOMAIN}
+      meta_launch_url: https://app.esharevice.com
       policy_engine_mode: any
       open_in_new_tab: false
 

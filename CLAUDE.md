@@ -717,6 +717,12 @@ Categories: `[Logic]` `[Null]` `[Memory]` `[Concurrency]` `[Type]` `[Network]` `
 
 ---
 
+### [Build] @types/express + pnpm Isolated Linking + TS Bundler Resolution = Broken Type Inference
+**Description:** With pnpm's default `node-linker=isolated` and TypeScript `moduleResolution: "Bundler"`, `@types/express`'s `///<reference types="express-serve-static-core" />` directive doesn't reliably resolve. Even a minimal `import type { Response } from "express"; res.status(404)` fails with `Property 'status' does not exist on type 'Response<any, Record<string, any>>'`. The trace confirms ESS-C *is* resolved, but TypeScript silently fails to expose its exported members to consuming code. Tried: `node-linker=hoisted`, `pnpm.overrides` to pin ESS-C, explicit `typeRoots`, custom `declare module` augmentations, switching to `NodeNext` resolution — none produced a clean compile.
+**Avoid:** For TS Express projects in a pnpm workspace, either (a) use a framework with self-contained types (Hono, Fastify, Elysia), (b) ditch the workspace and run Express in a plain Node project, or (c) hand-define minimal `Request`/`Response`/`NextFunction` types locally and treat `@types/express` as advisory. Don't waste a session on this in 2026.
+
+---
+
 ### [Type] Cloudflare Global API Key — Legacy 37-Hex Format Has Been Replaced by `cfk_*`
 **Description:** Cloudflare's Global API Key used to be a 37-character hex string. As of late 2025 they've migrated to a `cfk_<50 chars>` prefixed format without widely updating docs. Authentication still uses `X-Auth-Email` + `X-Auth-Key` headers (NOT Bearer), but auth fails with "Unknown X-Auth-Key or X-Auth-Email" if you use the wrong email — and the legacy 37-hex format check is gone, so even the right key with the wrong email gives an unhelpful "Unknown" message.
 **Avoid:** When debugging Cloudflare API auth: (a) confirm the account-login email (not necessarily a developer-comms email), (b) use scoped API Tokens instead of the Global Key whenever possible — they use `Authorization: Bearer ...` and are clearly diagnosable as valid vs invalid via `GET /user/tokens/verify`, (c) the Global Key remains valuable mostly when scoped tokens can't reach an endpoint, but Cloudflare is actively deprecating it (cf. Origin CA Key deprecation banner in the dashboard).

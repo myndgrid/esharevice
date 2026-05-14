@@ -1003,6 +1003,17 @@ These are isolated, reversible, low-risk fixes that don't require the new stack:
 ### 2026-05-11 00:00 UTC
 - Plan drafted; saved for user review. No code changes yet.
 
+### 2026-05-12 23:30 UTC — Week 3 partial: migration applied, API work paused
+
+What shipped:
+- **Drizzle migration `0000_0001_initial.sql` applied to live Postgres** at `esharevice-postgres-1` on the VPS. Both `users` and `exchange_items` tables exist with all FKs and indexes; the `search` column is a `tsvector` GENERATED ALWAYS AS STORED expression (weights A/B/C on provider/service/description), with the GIN index `exchange_items_search_idx`. `citext` extension is in use for `users.email`. Verified via `\d` against the live DB.
+
+What's deferred to next session — Express types blocker:
+- Wrote the full week-3 API code locally (jose JWKS middleware, lazy user provisioning, /v1/me, /v1/exchange-items CRUD with cursor pagination + Postgres FTS, OpenAPI gen from Zod). All correct at the runtime level.
+- **TypeScript cannot resolve Express's type story** under our `moduleResolution: "Bundler"` + pnpm-isolated linking + `@types/express` 5.0.6 + `@types/express-serve-static-core` 5.0.6 combination. Even minimal `import type { Response } from "express"; res.status(404)` fails with `Property 'status' does not exist on type 'Response<any, Record<string, any>>'`. Tried: hoisting via `.npmrc public-hoist-pattern`, `node-linker=hoisted`, pinning ESS-C via pnpm overrides, switching to `NodeNext` resolution, explicit `typeRoots`, custom `declare module` augmentation aligned with the generic signature — every combination produced different errors but none compiled.
+- Concluded the cleanest unblock is one of: **(a)** switch `apps/api` from Express to **Hono** (self-contained types, no peer-dep gymnastics), or **(b)** dispatch a focused subagent next session purely on the Express types puzzle with fresh context. Reverted the API code to the working week-1 skeleton; workspace typecheck is clean.
+- The migration SQL stays committed in `packages/db/drizzle/0000_0001_initial.sql` so the next attempt can rebuild the API against the already-deployed schema.
+
 ### 2026-05-12 22:45 UTC
 - **VPS deploy complete — week 2 fully delivered on the real Hetzner box (`2.24.195.151`, esharevice.com).**
 - Stack live: api, web, postgres (×2), redis, authentik-server, authentik-worker, caddy, uptime-kuma — all healthy. 5 Let's Encrypt certs issued. OIDC discovery serving real metadata at `https://auth.esharevice.com/application/o/e-sharevice-web/.well-known/openid-configuration`.

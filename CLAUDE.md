@@ -717,6 +717,12 @@ Categories: `[Logic]` `[Null]` `[Memory]` `[Concurrency]` `[Type]` `[Network]` `
 
 ---
 
+### [Build] Workspace Package Source Missing from Production Docker Image
+**Description:** A pnpm-workspace Dockerfile that prunes deps with `pnpm install --frozen-lockfile --prod` and then `COPY --from=prune /repo/packages` will ship only `package.json` + the symlinked `node_modules` for each workspace package — the actual `src/` is never in the prune stage because the install step only needs manifests. The runtime image looks fine (symlinks resolve, deps are present) but every `import "@esharevice/shared"` hits `ERR_MODULE_NOT_FOUND` because the target `src/` directory doesn't exist on disk.
+**Avoid:** In the runtime/runner stage, after copying `packages/` from prune, **explicitly COPY each workspace package's source from the build context**: `COPY packages/shared/src ./packages/shared/src` etc. Or do it in prune (right after the install). Add a Dockerfile comment so the next person doesn't simplify it away.
+
+---
+
 ### [Build] @types/express + pnpm Isolated Linking + TS Bundler Resolution = Broken Type Inference
 **Description:** With pnpm's default `node-linker=isolated` and TypeScript `moduleResolution: "Bundler"`, `@types/express`'s `///<reference types="express-serve-static-core" />` directive doesn't reliably resolve. Even a minimal `import type { Response } from "express"; res.status(404)` fails with `Property 'status' does not exist on type 'Response<any, Record<string, any>>'`. The trace confirms ESS-C *is* resolved, but TypeScript silently fails to expose its exported members to consuming code. Tried: `node-linker=hoisted`, `pnpm.overrides` to pin ESS-C, explicit `typeRoots`, custom `declare module` augmentations, switching to `NodeNext` resolution — none produced a clean compile.
 **Avoid:** For TS Express projects in a pnpm workspace, either (a) use a framework with self-contained types (Hono, Fastify, Elysia), (b) ditch the workspace and run Express in a plain Node project, or (c) hand-define minimal `Request`/`Response`/`NextFunction` types locally and treat `@types/express` as advisory. Don't waste a session on this in 2026.

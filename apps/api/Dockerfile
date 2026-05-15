@@ -1,4 +1,4 @@
-# Multi-stage build for the Express 5 + TypeScript API.
+# Multi-stage build for the Hono 4 + TypeScript API (Node adapter).
 # tsx runs the TS source directly in production — small footprint, no transpile step.
 # Built from the monorepo root: `docker build -f apps/api/Dockerfile -t esharevice-api .`
 
@@ -51,6 +51,11 @@ RUN apk add --no-cache tini wget && \
 COPY --from=prune --chown=nodeapp:nodejs /repo/node_modules ./node_modules
 COPY --from=prune --chown=nodeapp:nodejs /repo/apps/api/node_modules ./apps/api/node_modules
 COPY --from=prune --chown=nodeapp:nodejs /repo/packages ./packages
+# Prune only has package.json + node_modules per workspace package; pull the actual
+# TypeScript source from the build context so the api can `import "@esharevice/shared"`.
+COPY --chown=nodeapp:nodejs packages/shared/src ./packages/shared/src
+COPY --chown=nodeapp:nodejs packages/db/src ./packages/db/src
+COPY --chown=nodeapp:nodejs packages/db/drizzle ./packages/db/drizzle
 COPY --chown=nodeapp:nodejs apps/api ./apps/api
 COPY --chown=nodeapp:nodejs tsconfig.base.json ./
 

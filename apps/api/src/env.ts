@@ -8,9 +8,9 @@ const EnvSchema = z.object({
   DATABASE_URL: z.string().min(1),
   REDIS_URL: z.string().min(1).default("redis://localhost:6379"),
   // OIDC — Authentik is the issuer. The API never signs or stores secrets for tokens.
-  OIDC_ISSUER: z.string().url().optional(),
-  OIDC_AUDIENCE: z.string().min(1).optional(),
-  OIDC_JWKS_URL: z.string().url().optional(),
+  OIDC_ISSUER: z.string().url(),
+  OIDC_AUDIENCE: z.string().min(1),
+  OIDC_JWKS_URL: z.string().url(),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

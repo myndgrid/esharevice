@@ -1,9 +1,9 @@
-import { Router } from "express";
+import { Hono } from "hono";
 
-const router: Router = Router();
+const health = new Hono();
 
-router.get("/health", (_req, res) => {
-  res.json({ status: "ok", uptime: process.uptime() });
-});
+health.get("/health", (c) =>
+  c.json({ status: "ok", uptime: process.uptime() }),
+);
 
-export default router;
+export default health;

@@ -1,8 +1,8 @@
 # Task: TypeScript Migration & Frontend Redesign Plan
 
 **Created:** 2026-05-11 00:00 UTC
-**Last Updated:** 2026-05-12 22:45 UTC
-**Status:** v3.2 — weeks 1 + 2 shipped; production stack live at esharevice.com
+**Last Updated:** 2026-05-13 00:30 UTC
+**Status:** v3.3 — weeks 1 + 2 + 3 shipped; typed Hono API live at api.esharevice.com
 
 ---
 
@@ -1002,6 +1002,38 @@ These are isolated, reversible, low-risk fixes that don't require the new stack:
 
 ### 2026-05-11 00:00 UTC
 - Plan drafted; saved for user review. No code changes yet.
+
+### 2026-05-13 00:30 UTC — Week 3 complete: Hono swap + full /v1 API live
+
+The Express type-resolution dead end (see entry below) was resolved by swapping `apps/api` from Express to Hono. **Hono's types are self-contained — the workspace typechecked clean on the first attempt, no peer-dep gymnastics needed.**
+
+What shipped:
+- `apps/api` rewritten on **Hono 4.6** + `@hono/node-server` + `@hono/zod-openapi` + `@hono/swagger-ui` + `hono-rate-limiter` + built-in `cors` / `secureHeaders` / `logger` middleware. 180 packages removed, 70 added vs. the Express stack.
+- **jose JWKS middleware** (`requireAuth` + `attachAuth`) — ~70 lines, validates Authentik tokens against `OIDC_JWKS_URL`, attaches `c.var.user` + `c.var.auth` via lazy `resolveUserFromSub`.
+- **Lazy user provisioning** (`apps/api/src/lib/users.ts`) — first-sight insert with `onConflictDoUpdate` to handle the race.
+- **Cursor pagination** (`apps/api/src/lib/cursor.ts`) — base64-encoded `(ts, id)` tuple, opaque to clients.
+- **RFC 7807 error handler** — `app.onError` produces `application/problem+json` for `HTTPException`, `ZodError`, and unknown errors with prod/dev detail toggling.
+- **/v1 routes**, all defined with `createRoute` from `@hono/zod-openapi` so they're typed + auto-documented:
+  - `GET  /v1/me` (auth required)
+  - `GET  /v1/exchange-items` (public, cursor pagination, `?q=` Postgres FTS via `websearch_to_tsquery`)
+  - `GET  /v1/exchange-items/{id}` (public, 404 if missing)
+  - `POST /v1/exchange-items` (auth required, Zod body validation)
+  - `PUT  /v1/exchange-items/{id}/reserve` (auth required, 409 on own-item or already-reserved)
+- **OpenAPI 3.0 spec** served at `/v1/openapi.json` (Bearer security scheme registered) + Swagger UI at `/v1/docs`.
+- **Dockerfile updated** to (a) copy workspace package source from build context — previously only `package.json` shipped, leaving `@esharevice/shared/src` missing in the runtime container — and (b) keep the pruned `tsx`/Hono dep tree for `node --import tsx/esm`.
+
+Verified live (smoke tests through Caddy on esharevice.com):
+- `/health` and `/v1/health` → 200 JSON
+- `/v1/me` no token → 401 `application/problem+json` (RFC 7807)
+- `/v1/exchange-items` → 200 with `{"items":[],"next_cursor":null}`
+- `/v1/exchange-items?q=carpentry` → 200, FTS query runs through the GIN index
+- `/v1/openapi.json` → 200, full spec with all routes + Bearer security scheme
+- `/v1/docs` → 200 (Swagger UI HTML)
+
+What's deferred to week 4 (per the original plan):
+- Real image upload with multer-style multipart → sharp resize → R2 PUT.
+- Idempotency keys (Redis-backed).
+- Vitest + Supertest integration tests with mocked JWKS.
 
 ### 2026-05-12 23:30 UTC — Week 3 partial: migration applied, API work paused
 

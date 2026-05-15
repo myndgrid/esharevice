@@ -1,8 +1,8 @@
 # VPS Deployment Log — e-Sharevice (esharevice.com on Hostinger)
 
 **Created:** 2026-05-12 22:00 UTC
-**Last Updated:** 2026-05-12 22:45 UTC
-**Status:** Stack live; Authentik fully provisioned; OIDC + Resend SMTP wired; GHCR private-capable
+**Last Updated:** 2026-05-13 00:30 UTC
+**Status:** Stack live; Authentik fully provisioned; typed Hono /v1 API serving real routes
 
 The runbook's prerequisites were sourced from `tasks/.env.creds` (gitignored). The user opted for the "fast path" (option B in the kickoff exchange): use the master credentials once for setup, rotate after. **All four credentials below MUST be rotated** before this is treated as production.
 
@@ -139,6 +139,12 @@ Internal docker network (no internet egress for datastores):
 ---
 
 ## Progress Log
+
+### 2026-05-13 00:30 UTC — Hono API deployed
+- Swapped `apps/api` from Express to Hono. Typecheck clean on first attempt; no `@types/*` peer-dep gymnastics needed.
+- Live behind Caddy: `/health`, `/v1/health`, `/v1/me`, `/v1/exchange-items` (list, get, create, reserve), `/v1/openapi.json`, `/v1/docs`.
+- Smoke tests through `api.esharevice.com` all green: unauthenticated `/v1/me` returns `application/problem+json` 401 (RFC 7807); public `/v1/exchange-items?q=carpentry` runs Postgres FTS via the GIN index and returns the empty page.
+- One Dockerfile fix surfaced during deploy: the prune stage only ships `package.json` for workspace packages — the actual `packages/shared/src/`, `packages/db/src/`, and `packages/db/drizzle/` had to be COPYed from the build context into the runner. Captured in the bug registry as a [Build] entry.
 
 ### 2026-05-12 22:45 UTC
 - VPS docker authenticated to ghcr.io with a fresh GitHub PAT (`/home/ops/.docker/config.json`). Both `esharevice-{api,web}:latest` pull successfully.

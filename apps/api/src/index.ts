@@ -1,57 +1,85 @@
-import cors from "cors";
-import express from "express";
-import rateLimit from "express-rate-limit";
-import helmet from "helmet";
-import { pinoHttp } from "pino-http";
-import { env } from "./env";
-import { errorHandler, notFound } from "./middleware/error";
-import healthRouter from "./routes/health";
+import { serve } from "@hono/node-server";
+import { OpenAPIHono } from "@hono/zod-openapi";
+import { swaggerUI } from "@hono/swagger-ui";
+import { cors } from "hono/cors";
+import { logger } from "hono/logger";
+import { secureHeaders } from "hono/secure-headers";
+import { rateLimiter } from "hono-rate-limiter";
 
-const app = express();
+import { env } from "./env.js";
+import { notFound, onError } from "./middleware/error.js";
+import health from "./routes/health.js";
+import me from "./routes/v1/me.js";
+import exchangeItems from "./routes/v1/exchange-items.js";
+import type { AppEnv } from "./app.js";
 
-// Security + parsing.
-app.use(helmet());
-app.use(express.json({ limit: "1mb" }));
+const app = new OpenAPIHono<AppEnv>();
+
+// ─────────────────────── Global middleware
+app.use("*", secureHeaders());
+app.use("*", logger());
 app.use(
+  "*",
   cors({
-    origin: env.WEB_ORIGIN.split(",").map((o: string) => o.trim()),
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    origin: env.WEB_ORIGIN.split(",").map((o) => o.trim()),
     credentials: true,
+    allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   }),
 );
-
-// Structured request logs.
-app.use(pinoHttp({ level: env.NODE_ENV === "production" ? "info" : "debug" }));
-
-// Global rate limit (per-IP). Per-route limits land in week 3+.
 app.use(
-  rateLimit({
+  "*",
+  rateLimiter({
     windowMs: 60_000,
     limit: 300,
     standardHeaders: "draft-7",
-    legacyHeaders: false,
+    keyGenerator: (c) =>
+      c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ?? c.req.header("x-real-ip") ?? "unknown",
   }),
 );
 
-// /v1 surface — every public route is versioned from day one.
-const v1 = express.Router();
-v1.use(healthRouter);
+// ─────────────────────── Routes
+// Unversioned /health for load balancers.
+app.route("/", health);
 
-// Top-level health for load balancers (unversioned).
-app.use(healthRouter);
+// Versioned API surface.
+app.route("/v1", health); // also expose /v1/health
+app.route("/v1", me);
+app.route("/v1", exchangeItems);
 
-app.use("/v1", v1);
-
-// 404 + error handler must be last.
-app.use(notFound);
-app.use(errorHandler);
-
-const server = app.listen(env.API_PORT, () => {
-  // eslint-disable-next-line no-console
-  console.log(`[api] listening on http://localhost:${env.API_PORT}`);
+// ─────────────────────── OpenAPI spec + Swagger UI
+app.doc("/v1/openapi.json", {
+  openapi: "3.0.0",
+  info: {
+    title: "e-Sharevice API",
+    version: "0.1.0",
+    description: "Community skill / item exchange — versioned public API.",
+  },
+  servers: [
+    { url: "https://api.esharevice.com", description: "production" },
+    { url: "http://localhost:8080", description: "local dev" },
+  ],
 });
+app.openAPIRegistry.registerComponent("securitySchemes", "Bearer", {
+  type: "http",
+  scheme: "bearer",
+  bearerFormat: "JWT",
+  description: "Authentik-issued JWT access token.",
+});
+app.get("/v1/docs", swaggerUI({ url: "/v1/openapi.json" }));
 
-// Graceful shutdown — closes listeners cleanly so pending requests finish.
+// ─────────────────────── Error handling
+app.onError(onError);
+app.notFound(notFound);
+
+// ─────────────────────── Boot
+const server = serve(
+  { fetch: app.fetch, port: env.API_PORT, hostname: "0.0.0.0" },
+  (info) => {
+    // eslint-disable-next-line no-console
+    console.log(`[api] listening on http://${info.address}:${info.port}`);
+  },
+);
+
 const shutdown = (signal: NodeJS.Signals): void => {
   // eslint-disable-next-line no-console
   console.log(`[api] received ${signal}, shutting down`);
@@ -62,8 +90,9 @@ const shutdown = (signal: NodeJS.Signals): void => {
 process.on("SIGTERM", shutdown);
 process.on("SIGINT", shutdown);
 
-// Defensive — never let an unhandled rejection crash silently.
 process.on("unhandledRejection", (reason) => {
   // eslint-disable-next-line no-console
   console.error("[api] unhandledRejection", reason);
 });
+
+export { app };

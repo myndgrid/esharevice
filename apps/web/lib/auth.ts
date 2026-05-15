@@ -1,74 +1,57 @@
 import { redirect } from "next/navigation";
-import * as oauth from "oauth4webapi";
-import { getAuthServer, getClient, getClientAuth } from "./oidc";
-import {
-  clearSessionCookie,
-  readSession,
-  setSessionCookie,
-  type SessionData,
-} from "./session";
-
-// Refresh access tokens 60s before they actually expire so a long-running render
-// doesn't burn a fresh token mid-flight.
-const SKEW_SECONDS = 60;
+import { readAccessToken, readSession } from "./session";
 
 /**
- * Server-side auth helper. Returns a session whose access_token is guaranteed
- * to be valid for at least SKEW_SECONDS more seconds. Returns null if no
- * session OR if refresh failed (in which case the session cookie is cleared).
+ * Authenticated state returned to server components.
+ *
+ * The access_token is read from the short-lived `esharevice_at` cookie which
+ * is maintained by `apps/web/middleware.ts` — it's refreshed proactively
+ * before expiry, so server components can rely on it being valid.
+ *
+ * If middleware fails to refresh (Authentik down, refresh_token revoked), it
+ * clears the cookies, this function returns null, and `requireAuth` redirects
+ * to /api/auth/login.
  */
-export async function auth(): Promise<SessionData | null> {
+export type AuthenticatedSession = {
+  sub: string;
+  access_token: string;
+  id_token?: string;
+};
+
+/**
+ * Server-side auth helper. Pure read — does no refresh.
+ * Returns null when:
+ *   - No session cookie (anonymous user)
+ *   - Session cookie exists but access cookie doesn't (middleware refresh failed
+ *     OR matcher didn't run for this path — both effectively "not authenticated")
+ */
+export async function auth(): Promise<AuthenticatedSession | null> {
   const session = await readSession();
   if (!session) return null;
 
-  const now = Math.floor(Date.now() / 1000);
-  if (session.access_expires_at > now + SKEW_SECONDS) {
-    return session;
-  }
-
-  // Access expired (or about to). Refresh using the refresh_token.
-  if (!session.refresh_token) {
-    await clearSessionCookie();
-    return null;
-  }
-
-  try {
-    const as = await getAuthServer();
-    const client = getClient();
-    const clientAuth = getClientAuth();
-    const res = await oauth.refreshTokenGrantRequest(as, client, clientAuth, session.refresh_token);
-    const tokens = await oauth.processRefreshTokenResponse(as, client, res);
-
-    const updated: SessionData = {
-      sub: session.sub,
-      access_token: tokens.access_token,
-      access_expires_at:
-        Math.floor(Date.now() / 1000) +
-        (typeof tokens.expires_in === "number" ? tokens.expires_in : 900),
-      // Authentik rotates refresh tokens — use the new one if returned.
-      refresh_token: tokens.refresh_token ?? session.refresh_token,
-    };
-    if (typeof tokens.id_token === "string") {
-      updated.id_token = tokens.id_token;
-    } else if (session.id_token) {
-      updated.id_token = session.id_token;
-    }
-    await setSessionCookie(updated);
-    return updated;
-  } catch {
-    // Refresh failed (revoked, expired, or Authentik downtime). Force re-login.
-    await clearSessionCookie();
-    return null;
-  }
+  // The access cookie is short-lived and managed by middleware. It can be
+  // briefly absent for two reasons:
+  //   (a) the browser dropped it on expiry and the user hasn't yet hit a path
+  //       through middleware to refresh, or
+  //   (b) a credential-less probe request from the browser (Chromium's pre-
+  //       render / prefetch heuristics) is rendering this page.
+  // In either case the SESSION cookie alone is enough to say "logged in" —
+  // it carries the refresh token, and any API call that actually needs an
+  // access token can refresh via middleware on its own request.
+  const access_token = (await readAccessToken()) ?? "";
+  const out: AuthenticatedSession = { sub: session.sub, access_token };
+  if (session.id_token) out.id_token = session.id_token;
+  return out;
 }
 
 /**
- * Convenience wrapper for protected pages — redirects to /login if unauthenticated.
- * Pass the current path so the user lands back here after login.
+ * Convenience wrapper for protected pages — redirects to /api/auth/login if
+ * unauthenticated OR if the access token isn't currently available (a probe
+ * request without cookies would otherwise render a half-protected page).
  */
-export async function requireAuth(returnTo: string): Promise<SessionData> {
+export async function requireAuth(returnTo: string): Promise<AuthenticatedSession> {
   const session = await auth();
-  if (!session) {
+  if (!session || !session.access_token) {
     const params = new URLSearchParams({ return_to: returnTo });
     redirect(`/api/auth/login?${params.toString()}`);
   }

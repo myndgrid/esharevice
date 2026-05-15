@@ -38,3 +38,16 @@ export function getEnv(): Env {
   });
   return cached;
 }
+
+/**
+ * Public-facing origin (scheme://host) the browser uses to reach this app.
+ *
+ * Why this instead of `req.nextUrl.origin`: Next sits behind Caddy in prod, and
+ * Caddy doesn't forward X-Forwarded-Host by default. The upstream sees the
+ * internal Docker hostname (`web:3000`), so `req.nextUrl.origin` becomes
+ * `http://web:3000` — the browser can't reach that. OIDC_REDIRECT_URI has the
+ * real public URL and Authentik validates it, so we trust it as canonical.
+ */
+export function getPublicOrigin(): string {
+  return new URL(getEnv().OIDC_REDIRECT_URI).origin;
+}

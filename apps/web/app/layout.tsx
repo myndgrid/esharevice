@@ -4,6 +4,12 @@ import { Suspense } from "react";
 import { Header } from "../components/header";
 import "./globals.css";
 
+// Force dynamic rendering site-wide. The auth-aware <Header> reads cookies()
+// via auth(), which already triggers dynamic rendering for the *layout* — but
+// pages composed under this layout could otherwise be statically generated
+// with a stale unauthenticated header. Belt + suspenders.
+export const dynamic = "force-dynamic";
+
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",

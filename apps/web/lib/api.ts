@@ -49,7 +49,12 @@ async function call<T>(path: string, schema: z.ZodType<T>, opts: Options = {}): 
 
   if (opts.authed !== false) {
     const session = await auth();
-    if (session) headers["authorization"] = `Bearer ${session.access_token}`;
+    // Only attach if we actually have an access token. session.access_token
+    // can be an empty string when the page rendered from a credential-less
+    // probe request — sending `Bearer ` would just 401.
+    if (session?.access_token) {
+      headers["authorization"] = `Bearer ${session.access_token}`;
+    }
   }
 
   const controller = new AbortController();

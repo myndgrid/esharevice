@@ -165,3 +165,12 @@ Internal docker network (no internet egress for datastores):
 - Daily backup cron live; first backup uploaded; restore drill green.
 - Sentry DSNs wired; SDKs to be installed in app code during week 3+ of the migration plan.
 - VPS deploy log written here; lives alongside the original 2026-05-12 provisioning runbook for cross-reference.
+
+### 2026-05-15 23:40 UTC — Web hotfix: logout prefetch silent-signout
+
+- **Commit:** `46b82ea` on `main` — fix(web): make logout POST-only to stop prefetch silently signing users out.
+- **Image:** `ghcr.io/myndgrid/esharevice-web:latest` (also tagged `:46b82ea`), digest `sha256:c0dffed48a77fd00937694363322d3c810cc5fc6f2bb406c73a2c6ec1e59e900`, built with `docker buildx --platform linux/amd64` on the `esharevice-builder` context.
+- **Roll:** `docker compose pull web && docker compose up -d --force-recreate web` from `/opt/esharevice/infra`. Web container healthy in <1 s, Next.js Ready in 469 ms. No other services touched.
+- **Live verification:** `GET https://app.esharevice.com/api/auth/logout` now returns `405 Method Not Allowed` with no `Set-Cookie` and no `Location` header (was previously `307` with two cookie-deletion headers + cross-origin `Location` → the root cause of the silent signout). Home renders 200.
+- **Rollback if needed:** the previous commit's image isn't tagged on GHCR — rollback requires a local rebuild from `b8ceccf` and push. Mitigation for next time: every deploy now tags `:latest` + `:<short-sha>` at build time (this deploy did), so future rollbacks are a single `docker compose pull web` after re-tagging `latest` on GHCR.
+- **Captured pattern:** Bug-registry entry `[Security] Prefetched GET on a State-Clearing Route Silently Logs Users Out` added in the same commit. Future logout-style handlers must be POST + form, never `<Link>`.

@@ -907,6 +907,12 @@ Categories: `[Logic]` `[Null]` `[Memory]` `[Concurrency]` `[Type]` `[Network]` `
 
 ---
 
+### [Network] POST → 307 Redirect Preserves Method, Trips Django/Authentik CSRF With 403
+**Description:** `NextResponse.redirect(url)` in Next 15 defaults to **HTTP 307**, which preserves the request method on the redirect. If you POST to a Next route handler that redirects to a cross-origin Django-based service (Authentik, any DRF API), the browser POSTs the redirected URL. Django's CSRF middleware requires a CSRF token on every unsafe cross-origin POST — without one, you get `403 Forbidden — CSRF verification failed. Request aborted.` The error reads like an auth misconfiguration but is purely a method-preservation issue on the redirect.
+**Avoid:** When you need a browser to switch from POST to GET on a redirect (the canonical OIDC RP-Initiated Logout flow, redirect-after-POST, any cross-origin handoff), explicitly pass `303` to `NextResponse.redirect(url, 303)`. 303 ("See Other") is the only redirect status that the HTTP spec *requires* the browser to follow with GET regardless of the original method. 301/302 are "may convert to GET" (most browsers do, but per spec they shouldn't), 307/308 must preserve. Default to 303 for any POST → cross-origin GET handoff and you'll never debug a phantom CSRF error.
+
+---
+
 ### [Security] Prefetched GET on a State-Clearing Route Silently Logs Users Out
 **Description:** Next 15's `<Link>` auto-prefetches every internal href in the viewport (production) or on hover (dev). The prefetch is a `fetch()` to the same URL with `?_rsc=…` appended. If the target is a route handler that returns `Set-Cookie` headers — e.g. a logout handler that does `clearSessionCookieOn(response)` + `NextResponse.redirect(authentikEndSessionUrl)` — the browser **applies the Set-Cookie immediately** when the 302 response arrives, BEFORE attempting the redirect. The cross-origin redirect then fails CORS preflight (`Redirect is not allowed for a preflight request`) and the prefetch errors out, but the cookies have already been evicted. Net effect: visiting any page that mounts `<Link href="/api/auth/logout">` silently signs the user out within milliseconds, with the only forensic trail being a CORS error in the console. The symptom presents as "the home page renders unauthenticated even though I just logged in."
 **Avoid:** State-changing endpoints must not be reachable via GET — this is a hard rule, not a style preference. Concretely: (a) the route handler exports only `POST` (and `OPTIONS` if you support CORS — but auth handlers shouldn't), (b) the UI uses `<form action="/api/auth/logout" method="post"><button type="submit">…</button></form>` instead of `<Link>`, (c) any remaining auth `<Link>`s (login, callback) get `prefetch={false}` as defense-in-depth so a future GET handler being added on the other side doesn't reintroduce the bug. Generalize: a `Set-Cookie` header on a GET response is a smell. If you must keep GET for a state-changing route, refuse to act unless a CSRF/double-submit token is present in the query — but POST + form is the canonical answer.
@@ -1215,4 +1221,4 @@ node -e "const wtf = require('wtfnode'); setTimeout(wtf.dump, 5000);"
 
 ---
 
-*Last updated: 2026-05-15 23:32 UTC | Global SWE Agent Config | Adapt the Architecture and Project Structure sections per project — everything else applies universally. Bug registry: 38 entries (+1 from the week-5 logout-prefetch incident).*
+*Last updated: 2026-05-15 23:55 UTC | Global SWE Agent Config | Adapt the Architecture and Project Structure sections per project — everything else applies universally. Bug registry: 39 entries (+2 from the week-5 logout-prefetch incident — the GET-prefetch bug and the 307→303 CSRF cascade it uncovered).*

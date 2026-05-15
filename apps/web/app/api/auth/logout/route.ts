@@ -41,7 +41,13 @@ export async function POST(): Promise<NextResponse> {
     );
   }
 
-  const response = NextResponse.redirect(targetUrl);
+  // 303 (not Next's default 307) so the browser switches POST → GET when
+  // following the redirect. Authentik's end_session_endpoint runs behind
+  // Django's CSRF middleware: a cross-origin POST without a CSRF token is
+  // rejected with 403. OIDC RP-Initiated Logout also specifies that the
+  // RP "uses an HTTP GET or POST" — GET via top-level navigation is the
+  // canonical browser flow, and 303 is the standard way to coerce it.
+  const response = NextResponse.redirect(targetUrl, 303);
   clearSessionCookieOn(response);
   clearAccessCookieOn(response);
   return response;

@@ -907,6 +907,12 @@ Categories: `[Logic]` `[Null]` `[Memory]` `[Concurrency]` `[Type]` `[Network]` `
 
 ---
 
+### [Security] Prefetched GET on a State-Clearing Route Silently Logs Users Out
+**Description:** Next 15's `<Link>` auto-prefetches every internal href in the viewport (production) or on hover (dev). The prefetch is a `fetch()` to the same URL with `?_rsc=…` appended. If the target is a route handler that returns `Set-Cookie` headers — e.g. a logout handler that does `clearSessionCookieOn(response)` + `NextResponse.redirect(authentikEndSessionUrl)` — the browser **applies the Set-Cookie immediately** when the 302 response arrives, BEFORE attempting the redirect. The cross-origin redirect then fails CORS preflight (`Redirect is not allowed for a preflight request`) and the prefetch errors out, but the cookies have already been evicted. Net effect: visiting any page that mounts `<Link href="/api/auth/logout">` silently signs the user out within milliseconds, with the only forensic trail being a CORS error in the console. The symptom presents as "the home page renders unauthenticated even though I just logged in."
+**Avoid:** State-changing endpoints must not be reachable via GET — this is a hard rule, not a style preference. Concretely: (a) the route handler exports only `POST` (and `OPTIONS` if you support CORS — but auth handlers shouldn't), (b) the UI uses `<form action="/api/auth/logout" method="post"><button type="submit">…</button></form>` instead of `<Link>`, (c) any remaining auth `<Link>`s (login, callback) get `prefetch={false}` as defense-in-depth so a future GET handler being added on the other side doesn't reintroduce the bug. Generalize: a `Set-Cookie` header on a GET response is a smell. If you must keep GET for a state-changing route, refuse to act unless a CSRF/double-submit token is present in the query — but POST + form is the canonical answer.
+
+---
+
 ### [Type] Cloudflare Global API Key — Legacy 37-Hex Format Has Been Replaced by `cfk_*`
 **Description:** Cloudflare's Global API Key used to be a 37-character hex string. As of late 2025 they've migrated to a `cfk_<50 chars>` prefixed format without widely updating docs. Authentication still uses `X-Auth-Email` + `X-Auth-Key` headers (NOT Bearer), but auth fails with "Unknown X-Auth-Key or X-Auth-Email" if you use the wrong email — and the legacy 37-hex format check is gone, so even the right key with the wrong email gives an unhelpful "Unknown" message.
 **Avoid:** When debugging Cloudflare API auth: (a) confirm the account-login email (not necessarily a developer-comms email), (b) use scoped API Tokens instead of the Global Key whenever possible — they use `Authorization: Bearer ...` and are clearly diagnosable as valid vs invalid via `GET /user/tokens/verify`, (c) the Global Key remains valuable mostly when scoped tokens can't reach an endpoint, but Cloudflare is actively deprecating it (cf. Origin CA Key deprecation banner in the dashboard).
@@ -1209,4 +1215,4 @@ node -e "const wtf = require('wtfnode'); setTimeout(wtf.dump, 5000);"
 
 ---
 
-*Last updated: 2026-05-12 23:00 UTC | Global SWE Agent Config | Adapt the Architecture and Project Structure sections per project — everything else applies universally. Bug registry: 37 entries (+10 from the week-2 VPS provisioning session).*
+*Last updated: 2026-05-15 23:32 UTC | Global SWE Agent Config | Adapt the Architecture and Project Structure sections per project — everything else applies universally. Bug registry: 38 entries (+1 from the week-5 logout-prefetch incident).*

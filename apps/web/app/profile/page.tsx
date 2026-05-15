@@ -42,9 +42,9 @@ export default async function ProfilePage(): Promise<React.ReactElement> {
             <Link href="/">
               <Button variant="secondary" size="sm">Back to home</Button>
             </Link>
-            <Link href="/api/auth/logout">
-              <Button variant="ghost" size="sm">Sign out</Button>
-            </Link>
+            <form action="/api/auth/logout" method="post">
+              <Button type="submit" variant="ghost" size="sm">Sign out</Button>
+            </form>
           </div>
         </CardContent>
       </Card>

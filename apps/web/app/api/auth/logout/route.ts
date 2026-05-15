@@ -15,8 +15,14 @@ export const dynamic = "force-dynamic";
  *  2. Redirect to Authentik's end_session_endpoint with id_token_hint so
  *     Authentik also clears its SSO cookie. If Authentik returns a
  *     post_logout_redirect_uri we end up back at the app's home.
+ *
+ * POST-only: Next 15's <Link> prefetches GET responses, and Set-Cookie
+ * headers from a prefetch are applied to the browser. A GET logout
+ * handler silently signs users out as soon as any page mounts a
+ * <Link href="/api/auth/logout"> in the viewport — even if they never
+ * click it. State-changing endpoints must not be reachable via GET.
  */
-export async function GET(): Promise<NextResponse> {
+export async function POST(): Promise<NextResponse> {
   const publicOrigin = getPublicOrigin();
   const session = await readSession();
 

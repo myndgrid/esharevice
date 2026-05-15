@@ -23,7 +23,7 @@ export async function Header(): Promise<React.ReactElement> {
               <Avatar size="sm" name="You" />
             </Link>
           ) : (
-            <Link href="/api/auth/login?return_to=/">
+            <Link href="/api/auth/login?return_to=/" prefetch={false}>
               <Button variant="primary" size="sm">Sign in</Button>
             </Link>
           )}

@@ -174,3 +174,12 @@ Internal docker network (no internet egress for datastores):
 - **Live verification:** `GET https://app.esharevice.com/api/auth/logout` now returns `405 Method Not Allowed` with no `Set-Cookie` and no `Location` header (was previously `307` with two cookie-deletion headers + cross-origin `Location` → the root cause of the silent signout). Home renders 200.
 - **Rollback if needed:** the previous commit's image isn't tagged on GHCR — rollback requires a local rebuild from `b8ceccf` and push. Mitigation for next time: every deploy now tags `:latest` + `:<short-sha>` at build time (this deploy did), so future rollbacks are a single `docker compose pull web` after re-tagging `latest` on GHCR.
 - **Captured pattern:** Bug-registry entry `[Security] Prefetched GET on a State-Clearing Route Silently Logs Users Out` added in the same commit. Future logout-style handlers must be POST + form, never `<Link>`.
+
+### 2026-05-15 23:55 UTC — Web hotfix-of-hotfix: 307 → 303 on logout redirect
+
+- **Commit:** `4eb2c6a` — fix(web): use 303 (not Next's default 307) on logout redirect.
+- **Why:** the prior fix surfaced a second bug. After switching the form to POST, the browser followed Next's default 307 redirect to Authentik with the POST method preserved. Authentik (Django) rejected with `403 — CSRF verification failed`. Fix: pass `303` to `NextResponse.redirect`, which forces the browser to GET on follow — the canonical OIDC RP-Initiated Logout flow.
+- **Image:** `ghcr.io/myndgrid/esharevice-web:latest` + `:4eb2c6a`, digest `sha256:97cc758e155f3b37d02fffa9f4fa1d19b80874a9c16c95690073a5b5b26da30b`.
+- **Roll:** `docker compose pull web && up -d --force-recreate web`. Ready in 360 ms.
+- **Live verification:** `POST https://app.esharevice.com/api/auth/logout` (no cookies) now returns `303` with `Location: https://app.esharevice.com/`. `GET` still 405. End-to-end logout from a logged-in browser should now follow `POST /api/auth/logout` → `303` → `GET auth.esharevice.com/.../end-session/?...` → Authentik clears SSO cookie → `302` to `post_logout_redirect_uri=https://app.esharevice.com/` → home renders unauth.
+- **Captured pattern:** Bug-registry entry `[Network] POST → 307 Redirect Preserves Method, Trips Django/Authentik CSRF With 403` added in the same commit. Use 303 for any POST → cross-origin GET handoff.

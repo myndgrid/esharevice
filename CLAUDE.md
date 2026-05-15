@@ -28,28 +28,62 @@ You are a **senior defensive software engineer**. Mistakes in software have real
 
 ## Project Architecture — Know This First
 
-> **Fill this section in for each project. Replace the placeholder rows with the actual file roles, classes, and architectural facts for the codebase you're working in.**
-
 ### File Roles
 
 | File | Role | Notes |
 |---|---|---|
-| *(add entries)* | | |
+| `apps/api/src/index.ts` | API entry — Hono app + global middleware + OpenAPI mount + Node-adapter `serve()` | All routes mounted via `app.route("/v1", ...)`; `onError` + `notFound` registered LAST |
+| `apps/api/src/app.ts` | Typed Hono context shape (`AppEnv`) — `Variables: { user, auth }` | Every route handler in the workspace generics on `AppEnv` |
+| `apps/api/src/env.ts` | Zod-validated process env | OIDC fields are REQUIRED; the api crashes at boot if any are missing |
+| `apps/api/src/middleware/auth.ts` | `requireAuth` (hard) + `attachAuth` (soft) — jose JWKS verifier + lazy user provisioning | JWKS is cached in-memory by jose; one cold call per cache miss |
+| `apps/api/src/middleware/error.ts` | `onError` + `notFound` — produce RFC 7807 `application/problem+json` | Detail is omitted in production for 500s |
+| `apps/api/src/lib/users.ts` | `resolveUserFromSub` — first-sight insert with `onConflictDoUpdate` | Handles the SELECT/INSERT race |
+| `apps/api/src/lib/cursor.ts` | Base64-encoded `(ts, id)` cursor | Opaque to clients |
+| `apps/api/src/lib/image-url.ts` | Compose CDN URL from R2 object key | Stub until week-4 R2 wiring |
+| `apps/api/src/routes/v1/me.ts` | `GET /v1/me` (auth required) | Returns `UserPublic` |
+| `apps/api/src/routes/v1/exchange-items.ts` | CRUD + reserve, with cursor pagination + Postgres FTS | `?q=` uses `websearch_to_tsquery` against the `search` tsvector column |
+| `packages/db/src/schema.ts` | Drizzle Postgres schema | `users.email` is `citext`; `exchange_items.search` is GENERATED ALWAYS STORED tsvector with weighted A/B/C tokens |
+| `packages/db/src/index.ts` | `getDb()` connection-pool helper, lazy + singleton | Pool size 10; `closeDb()` for graceful shutdown |
+| `packages/db/drizzle/0000_0001_initial.sql` | First migration — applied to live Postgres on 2026-05-12 | Includes the GIN index on `exchange_items.search` (manual, not Drizzle-generated) |
+| `packages/shared/src/schemas/*.ts` | Zod schemas, shared web ↔ api | `UserPublic`, `ExchangeItem`, `ExchangeItemCreate/Update`, `CursorQuery`, `cursorPage`, `Problem` |
+| `apps/web/app/layout.tsx` | Next.js root layout — theme bootstrap script, Inter font, viewport-fit=cover | Theme is applied BEFORE paint (no flash) |
+| `apps/web/app/globals.css` | Imports `@esharevice/ui/styles.css` (oklch tokens) + base reset | |
+| `infra/docker-compose.yml` | Production stack — 9 services across two networks (edge, internal) | Compose project name is `esharevice` |
+| `infra/docker-compose.dev.yml` | Local dev — only postgres + redis on host ports | Web + api run on host via `pnpm dev` |
+| `infra/Caddyfile` | Edge proxy + TLS termination + HSTS preload | Reads `${DOMAIN}` + `${LETSENCRYPT_EMAIL}` + `${UPTIME_BASIC_AUTH_HASH}` from container env |
+| `infra/authentik/blueprints/esharevice.yaml` | Declarative OIDC provider config (3 Applications) | Auto-applied on Authentik boot; re-apply via `POST /api/v3/managed/blueprints/{pk}/apply/` |
+| `infra/scripts/backup.sh` | Daily `pg_dump` → gzip → age-encrypt → rclone to B2 | Cron'd at 03:00 UTC; reads `/etc/esharevice-backup.env` (root-only) |
+| `infra/scripts/restore-drill.sh` | Quarterly restore drill into a throwaway Postgres container | Tolerates empty pre-migration DB |
 
 ### Key Architectural Facts
 
-- *(Document the framework and version — e.g. Express 5 vs 4 have breaking differences)*
-- *(Document the persistence strategy — database, file-based, in-memory, etc.)*
-- *(Document any child process, worker thread, or queue architecture)*
-- *(Document real-time communication — SSE, WebSockets, polling)*
-- *(Document whether there is a build step / bundler, or if assets are served raw)*
-- *(Document any dual-mode components — things that must work in two different contexts)*
+- **API framework is Hono 4 on `@hono/node-server`** — NOT Express. Express was attempted in weeks 1-2 but the `@types/express` + pnpm-isolated-linking + TS `Bundler` resolution combination has unsolvable type-resolution issues (see bug-registry entry). Hono's types are self-contained and just work.
+- **Routes are defined with `@hono/zod-openapi`'s `createRoute()`** — single source of truth for routing, validation, AND OpenAPI documentation. Never define a route without a `createRoute` schema.
+- **Authentik is the OIDC issuer; the API only verifies.** No password storage, no bcrypt, no `JWT_SECRET` env var in the API. JWKS URL comes from `OIDC_JWKS_URL`; jose handles caching. User rows are provisioned lazily on first sight of a valid `sub`.
+- **JWT claims are OIDC-standard only** (`sub`, `iss`, `aud`, `exp`, `iat`, `email`, `email_verified`). No app-specific claims in the token — app data is fetched by `sub` on each request. This keeps the door open to swap Authentik for another OIDC provider later.
+- **Postgres FTS, not Meilisearch.** `exchange_items.search` is a GENERATED ALWAYS STORED `tsvector` column with weights A (provider) / B (service) / C (description). Queries use `websearch_to_tsquery('english', $q)` against a GIN index named `exchange_items_search_idx`.
+- **Drizzle migrations live in `packages/db/drizzle/`.** Generated SQL is checked in. Applied on the live VPS via `docker exec -i esharevice-postgres-1 psql ... < migration.sql`. There's no in-app migration runner yet (planned for week 4).
+- **Persistence is single-source: Postgres only.** The legacy `data.json` / `reserved.json` dual-write from `Repo/` is gone — never reintroduced.
+- **Object storage:** Cloudflare R2 for images, keyed by `sha256(content).webp`. Wiring lands week 4; until then, `img_key` columns are nullable and `imgUrlFromKey()` returns `null`.
+- **No SSE/WebSockets yet.** Messages feature will likely land on **Server-Sent Events** (simpler than WS, works through Caddy without ProtocolUpgrade games). Decided not started.
+- **No build step for the API** — `tsx` runs TypeScript source directly via `node --import tsx/esm src/index.ts`. The Dockerfile has a typecheck gate (`pnpm typecheck`) as the type safety; runtime is unbuilt TS.
+- **pnpm uses `node-linker=hoisted`** (set in `.npmrc`). This is a deliberate choice to keep TS auto-discovery of transitive `@types/*` working. Switching back to isolated breaks several things subtly; don't.
+- **Workspace package source MUST be copied into Docker images explicitly** — see the [Build] bug-registry entry. `pnpm install --prod` in the prune stage ships only `package.json` + node_modules per workspace package; the actual `src/` folders need a separate COPY in the runner stage.
 
 ### Class / Module Map
 
 | Class / Module | Responsibility |
 |---|---|
-| *(add entries)* | |
+| `OpenAPIHono<AppEnv>` (from `@hono/zod-openapi`) | Root and per-route-group Hono app; `app.openapi()` registers a route with schema + handler in one call |
+| `createRoute()` | OpenAPI-route builder — defines method, path, params, body, responses, security, middleware |
+| `requireAuth` middleware | Throws 401 `HTTPException` if no valid JWT; otherwise sets `c.var.user` + `c.var.auth` |
+| `attachAuth` middleware | Soft variant — attaches if present, never rejects |
+| `resolveUserFromSub(sub, claims)` | Finds-or-creates the local `users` row for a given Authentik `sub` |
+| `encodeCursor` / `decodeCursor` | Opaque base64 wrappers for the `(created_at, id)` pagination tuple |
+| `onError` / `notFound` | Hono hooks → RFC 7807 `application/problem+json` responses |
+| `getDb()` | Drizzle client (lazy singleton) — call from every route handler |
+| `users`, `exchangeItems` | Drizzle table builders; the `User` / `ExchangeItemRow` types are inferred from them |
+| `UserPublic`, `ExchangeItem`, `ExchangeItemCreate`, `CursorQuery`, `cursorPage`, `Problem` | Zod schemas in `packages/shared` — re-exported from `@esharevice/shared` |
 
 ---
 
@@ -93,11 +127,94 @@ You are a **senior defensive software engineer**. Mistakes in software have real
 
 ## Project Structure
 
-> **Replace this with the actual directory tree for the project.**
-
 ```
-project-root/
-├── (fill in)
+e-sharevice/
+├── apps/
+│   ├── api/                          Hono 4 + TypeScript API
+│   │   ├── src/
+│   │   │   ├── app.ts                Typed AppEnv (Variables: user, auth)
+│   │   │   ├── env.ts                Zod-validated process env
+│   │   │   ├── index.ts              Entry — middleware stack + route mount + serve()
+│   │   │   ├── lib/                  Pure helpers (no framework deps)
+│   │   │   │   ├── cursor.ts         encodeCursor / decodeCursor
+│   │   │   │   ├── image-url.ts      R2 key → public URL
+│   │   │   │   └── users.ts          resolveUserFromSub
+│   │   │   ├── middleware/
+│   │   │   │   ├── auth.ts           jose JWKS verifier (require + attach)
+│   │   │   │   └── error.ts          onError + notFound — RFC 7807
+│   │   │   └── routes/
+│   │   │       ├── health.ts         /health (also re-mounted at /v1/health)
+│   │   │       └── v1/
+│   │   │           ├── me.ts         GET /v1/me
+│   │   │           └── exchange-items.ts  list / get / create / reserve
+│   │   ├── .env.example
+│   │   ├── Dockerfile                Multi-stage; tsx runtime; workspace-src COPYs in runner
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   └── web/                          Next.js 15 + React 19
+│       ├── app/
+│       │   ├── globals.css           Imports @esharevice/ui/styles.css
+│       │   ├── layout.tsx            Theme bootstrap, Inter font
+│       │   └── page.tsx              Stub home page (real pages land week 5+)
+│       ├── public/                   Empty placeholder (.gitkeep)
+│       ├── Dockerfile                Next.js standalone build
+│       ├── next-env.d.ts
+│       ├── next.config.mjs           output: "standalone", typedRoutes on
+│       └── tsconfig.json
+├── packages/
+│   ├── db/                           Drizzle Postgres schema + migrations
+│   │   ├── drizzle/
+│   │   │   ├── 0000_0001_initial.sql Applied to live DB on 2026-05-12
+│   │   │   └── meta/                 Drizzle journal + snapshot
+│   │   ├── src/
+│   │   │   ├── index.ts              getDb() + closeDb()
+│   │   │   └── schema.ts             users + exchangeItems
+│   │   └── drizzle.config.ts
+│   ├── shared/                       Zod schemas (exported to web + api)
+│   │   └── src/
+│   │       ├── index.ts              Barrel
+│   │       └── schemas/
+│   │           ├── user.ts
+│   │           ├── exchange-item.ts
+│   │           ├── pagination.ts     CursorQuery + cursorPage()
+│   │           └── problem.ts        RFC 7807 Problem
+│   └── ui/                           Design tokens + primitives
+│       └── src/
+│           ├── index.ts              Exports cn() helper
+│           ├── styles.css            oklch tokens — light + dark + prefers-color-scheme
+│           └── utils.ts              cn (classnames)
+├── infra/
+│   ├── docker-compose.yml            Production stack (9 services, 2 networks)
+│   ├── docker-compose.dev.yml        Local datastores only (postgres + redis)
+│   ├── Caddyfile                     Edge proxy + auto-TLS + HSTS
+│   ├── .env.example                  Documents every secret needed at deploy
+│   ├── postgres/init/
+│   │   └── 01-extensions.sql         citext + pgcrypto on first DB boot
+│   ├── authentik/blueprints/
+│   │   └── esharevice.yaml           Declarative OAuth2 provider config
+│   └── scripts/
+│       ├── backup.sh                 Daily 03:00 UTC cron — pg_dump + age + B2
+│       └── restore-drill.sh          Quarterly cron — pull + decrypt + restore
+├── docs/
+│   └── features/                     Timestamped feature design docs
+├── tasks/
+│   ├── 2026-05-11_typescript-migration-and-redesign-plan.md   Master plan + decision log
+│   ├── 2026-05-12_vps-provisioning-runbook.md                  How to provision a fresh VPS
+│   └── 2026-05-12_vps-deployment-log.md                        What's actually deployed + bug log
+├── .github/workflows/
+│   └── ci.yml                        Typecheck + lint on push/PR
+├── Repo/                             LEGACY reference-only — original JS app, gitignored
+├── .env.example                      Root — documents shared envs (DB, OIDC, Sentry, etc.)
+├── .gitignore                        Airtight (every .env variant + *.creds + Repo/)
+├── .npmrc                            node-linker=hoisted (intentional — see Framework Notes)
+├── .nvmrc                            Node 20.10
+├── .prettierrc.json
+├── CLAUDE.md                         This file
+├── README.md                         User-facing onboarding
+├── package.json                      pnpm workspace root + Turborepo
+├── pnpm-workspace.yaml
+├── tsconfig.base.json                Strict TS — noUncheckedIndexedAccess + exactOptionalPropertyTypes
+└── turbo.json
 ```
 
 ---
@@ -226,13 +343,74 @@ Before any task touching env vars:
 
 ## Framework & Runtime Notes
 
-> **Fill this section in per project.** Use it to capture breaking differences, version-specific gotchas, and non-obvious runtime behaviors that affect how you write code.
+### Hono 4 (apps/api)
 
-**Example entries to adapt:**
+- **Routes are typed via `@hono/zod-openapi`.** Always define handlers with `app.openapi(createRoute({...}), handler)` — never use bare `app.get/post/put`. The OpenAPI metadata IS the route's source of truth (path, query, params, body, response shapes, security).
+- **Context is generic.** `OpenAPIHono<AppEnv>` where `AppEnv = { Variables: { user, auth } }`. Middleware sets values via `c.set("user", ...)`, handlers read via `c.get("user")`. Never use `c.req.json()` without `c.req.valid("json")` — the latter returns the Zod-validated, typed body.
+- **Errors must throw `HTTPException`.** `throw new HTTPException(404, { message: "Not Found" })`. The global `onError` translates these to RFC 7807 `application/problem+json` automatically. Never write `c.json({error: ...}, 500)` directly.
+- **No middleware wrappers like `asyncHandler`** — Hono's middleware signature is `async (c, next) => { ... await next(); ... }`. Throws are caught.
+- **Listening:** `serve({ fetch: app.fetch, port, hostname: "0.0.0.0" })`. Binding to `0.0.0.0` (not the default `127.0.0.1`) is required inside Docker.
 
-- *Express 5 catches async errors natively — no `asyncHandler` wrapper needed (opposite of Express 4)*
-- *This project uses Python 3.11 — `tomllib` is in stdlib, no third-party dep needed*
-- *React 18 — concurrent features enabled by default; `useEffect` runs twice in StrictMode*
+### TypeScript
+
+- **Strict mode is non-negotiable** — `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`. This catches `array[0]` returning `T | undefined` automatically; guard with `if (!row) throw ...`.
+- **Module resolution is `Bundler`.** Imports do NOT need `.js` extensions in the source. The TSX runtime resolves them; `tsc` doesn't emit anything (no build step for the api).
+- **Verbatim module syntax is OFF** — `import { X }` works for both types and values. Use `import type { X }` for type-only when it makes intent clearer.
+
+### pnpm
+
+- **`.npmrc` sets `node-linker=hoisted`.** This is INTENTIONAL. Switching to the default isolated linker breaks TS auto-discovery of transitive `@types/*` packages. If you're tempted to remove this line, read the bug-registry entry first.
+- **Workspace deps use `workspace:*`.** Resolved to actual versions at publish time (n/a here — these are private packages).
+- **`pnpm --filter <pkg>` works for any workspace package.** `pnpm --filter @esharevice/api dev` is the canonical way to run a single app.
+
+### Postgres + Drizzle
+
+- **`citext` for emails.** `users.email` is `citext`, not `text`. Email comparisons are case-insensitive without `LOWER()` wrappers.
+- **Generated tsvector for FTS.** `exchange_items.search` is a GENERATED ALWAYS STORED column with weights A (provider) / B (service) / C (description). The GIN index `exchange_items_search_idx` is created in the migration SQL (Drizzle can't currently express `USING gin` on a generated column — it's manual).
+- **FTS queries use `websearch_to_tsquery`.** NOT `to_tsquery`. The former parses Google-style "phrase searches" + `OR` + `-` operators safely; the latter requires manual escaping.
+- **Migrations live in `packages/db/drizzle/`** as plain SQL files. Generate with `pnpm --filter @esharevice/db db:generate`; apply via `docker exec ... psql < migration.sql` on the VPS. No in-app migration runner yet.
+- **Timestamps are `timestamptz`.** Never use bare `timestamp`. JavaScript dates serialize to ISO 8601 strings on read.
+
+### Authentik (OIDC)
+
+- **The API never signs tokens** — it only validates them against `OIDC_JWKS_URL` via jose. Issuer + audience must match `OIDC_ISSUER` / `OIDC_AUDIENCE`.
+- **Blueprints are declarative but silently fail** — see the [Build] bug-registry entry. Always verify Application/Provider rows exist via the API after applying, never trust the wrapper "SUCCESS" log line.
+- **No `${VAR}` substitution in blueprints.** Hardcode the canonical domain, OR use Authentik's `!Env` / `!Context` YAML tags. Shell-style interpolation is parsed literally.
+- **`redirect_uris: []` is required even for client_credentials** providers. The serializer enforces presence regardless of `client_type`.
+
+### Docker / Compose
+
+- **Compose interpolates `$` in `.env` values.** Bcrypt hashes (`$2a$14$...`) need `$$` escaping. Don't write bcrypt directly into `.env`.
+- **Workspace package source must be COPYed into the runner stage** of any image — the prune stage only ships `package.json` + node_modules. See [Build] bug entry.
+- **`docker compose up -d --force-recreate <service>`** is the right way to re-roll one service after an env change. Avoid `docker compose down`/`up`; that takes everything offline.
+
+### Caddy
+
+- **Auto-TLS via Let's Encrypt** — no manual cert work. Each hostname block triggers a cert issuance on first request.
+- **`header_up X-Forwarded-Proto` is deprecated.** Caddy 2 sets it automatically; explicit lines emit warnings on every reload.
+- **Cloudflare proxy must be OFF (gray cloud)** for hostnames where Caddy provisions certs. With orange-cloud on, Cloudflare's edge cert interferes with Let's Encrypt validation.
+
+### Next.js 15 (apps/web)
+
+- **`output: "standalone"`** in `next.config.mjs` — required for the production Docker image.
+- **`apps/web/public/` MUST exist** (even if empty with a `.gitkeep`). The Dockerfile COPYs it.
+- **`transpilePackages: ["@esharevice/ui", "@esharevice/shared"]`** — workspace packages don't compile until needed.
+- **No-flash theme bootstrap** — a `<script dangerouslySetInnerHTML>` in `app/layout.tsx` reads `localStorage.theme` and sets `[data-theme]` BEFORE first paint. Don't refactor this to a React effect (it'll cause a flicker).
+
+### Sentry (apps/api + apps/web)
+
+- **DSNs are in env (`SENTRY_DSN_WEB`, `SENTRY_DSN_API`)** but no SDK is initialized yet. The wiring lands in week 5 — until then, no events reach Sentry.
+
+### Resend (transactional email)
+
+- **Domain MUST be verified** at https://resend.com/domains before any send works. The SMTP credentials are valid even when the domain isn't — sends just return 403 `validation_error`.
+- **Authentik uses Resend SMTP** for password-reset / signup-verification emails. Credentials live in `infra/.env` under `AUTHENTIK_EMAIL_*`; the API doesn't send email yet.
+
+### Backups + restore
+
+- **Daily `pg_dump` at 03:00 UTC** of both Postgres instances (app + Authentik). Output is gzipped, age-encrypted with the public key in `/etc/esharevice-backup.env`, uploaded to `b2:esharevice-backups/daily/<UTC-timestamp>/`. Retention 30 days.
+- **Quarterly restore drill** on the 1st of every 3rd month at 04:00 UTC. Pulls the latest backup, decrypts, restores into a throwaway Postgres container, asserts the schema responds. Fails loudly.
+- **Age private key is at `/root/.age/identity.key`** on the VPS (root-only). Same key is in the user's password manager (1Password/Bitwarden). Without it, no backup is recoverable.
 
 ---
 

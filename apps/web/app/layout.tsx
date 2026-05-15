@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import { Suspense } from "react";
+import { Header } from "../components/header";
 import "./globals.css";
 
 const inter = Inter({
@@ -40,7 +42,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeBootstrap }} />
       </head>
-      <body>{children}</body>
+      <body className="bg-bg text-fg">
+        <Suspense fallback={<HeaderSkeleton />}>
+          <Header />
+        </Suspense>
+        {children}
+      </body>
     </html>
+  );
+}
+
+function HeaderSkeleton(): React.ReactElement {
+  return (
+    <div className="sticky top-0 z-40 w-full border-b border-border bg-bg/80 backdrop-blur">
+      <div className="mx-auto h-14 max-w-5xl px-4" />
+    </div>
   );
 }

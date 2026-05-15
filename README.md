@@ -121,10 +121,11 @@ For full OIDC login to work locally, see [tasks/2026-05-12_vps-provisioning-runb
 
 | Doc | Purpose |
 |---|---|
-| [tasks/2026-05-11_typescript-migration-and-redesign-plan.md](tasks/2026-05-11_typescript-migration-and-redesign-plan.md) | Master plan + week-by-week roadmap + decision log (current: **v3.3**) |
+| [tasks/2026-05-11_typescript-migration-and-redesign-plan.md](tasks/2026-05-11_typescript-migration-and-redesign-plan.md) | Master plan + week-by-week roadmap + decision log (current: **v3.4**) |
 | [tasks/2026-05-12_vps-provisioning-runbook.md](tasks/2026-05-12_vps-provisioning-runbook.md) | 12-step runbook for provisioning a fresh VPS (re-creatable from scratch) |
 | [tasks/2026-05-12_vps-deployment-log.md](tasks/2026-05-12_vps-deployment-log.md) | What's actually deployed on the live box, bug-by-bug |
 | [docs/features/2026-05-13_v1-api-surface.md](docs/features/2026-05-13_v1-api-surface.md) | Design of the /v1 API: routing, auth, pagination, errors, FTS |
+| [docs/features/2026-05-14_web-oidc-login-flow.md](docs/features/2026-05-14_web-oidc-login-flow.md) | Web app: OIDC code+PKCE flow, session cookies, design system, layout shell |
 | [CLAUDE.md](CLAUDE.md) | Agent instructions, project-specific architecture notes, living bug registry |
 
 ---

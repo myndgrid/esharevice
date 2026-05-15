@@ -1,8 +1,8 @@
 # Task: TypeScript Migration & Frontend Redesign Plan
 
 **Created:** 2026-05-11 00:00 UTC
-**Last Updated:** 2026-05-13 00:30 UTC
-**Status:** v3.3 — weeks 1 + 2 + 3 shipped; typed Hono API live at api.esharevice.com
+**Last Updated:** 2026-05-14 21:00 UTC
+**Status:** v3.4 — weeks 1-3 shipped + first web slice live (OIDC login + design system + home/profile pages)
 
 ---
 
@@ -1002,6 +1002,36 @@ These are isolated, reversible, low-risk fixes that don't require the new stack:
 
 ### 2026-05-11 00:00 UTC
 - Plan drafted; saved for user review. No code changes yet.
+
+### 2026-05-14 21:00 UTC — First web slice live: OIDC login + design system + pages
+
+The web frontend goes from a stub page to a real, themed, auth-capable Next.js 15 app live at `https://app.esharevice.com`.
+
+What shipped:
+- **Direct OIDC client** (NOT NextAuth/Auth.js). Built on `oauth4webapi` — `lib/oidc.ts` + `lib/session.ts` + four route handlers under `app/api/auth/`. Full PKCE auth-code flow, signed HttpOnly session cookie (30d) signed with `jose` HS256, separate short-lived state cookie (10m) carrying the PKCE verifier + nonce + state + return_to.
+- **Server-side `auth()` helper** that returns a session whose access token is guaranteed valid for the next 60 s — refreshes inline against Authentik when the token is about to expire. Rotating refresh tokens are picked up automatically. Failure paths (revoked/expired refresh) clear the cookie cleanly.
+- **Typed API client** (`lib/api.ts`) using the shared Zod schemas from `@esharevice/shared`. Public endpoints skip the auth round-trip; protected endpoints attach `Authorization: Bearer ${session.access_token}`. Server-component fetch supports Next 15's `revalidate` and `cache: no-store` modes.
+- **Tailwind v4** wired up via `@theme inline` consuming the existing oklch CSS variables from `@esharevice/ui/styles.css`. Utilities like `bg-bg`, `text-fg-muted`, `bg-accent` map directly to the variables, so dark-mode flip happens with zero React re-render.
+- **UI primitives** (`@esharevice/ui`): `Button` (CVA — primary/secondary/ghost/danger/link), `Avatar` (initials fallback), `Card` + `CardContent`. `cn()` helper now uses `tailwind-merge` for conflict resolution.
+- **Layout shell**: `Header` (server component, auth-aware — shows Sign-in button or Avatar link to /profile based on `auth()`), `ThemeToggle` (client component wired to existing `localStorage.theme` + `data-theme` bootstrap).
+- **Home page** (`/`) — server component, fetches `/v1/exchange-items?limit=20` via the typed API client, renders cards. Graceful error + empty states.
+- **Protected `/profile`** — calls `requireAuth("/profile")`; unauthenticated requests get 307'd to `/api/auth/login?return_to=/profile`. Authenticated requests pull from `/v1/me`. Sign-out link present.
+
+One Next.js 15 gotcha surfaced and fixed:
+- **Env must be lazy.** `next build` statically evaluates module-level code in route handlers ("Collecting page data") — the original top-level `const env = EnvSchema.parse(...)` exploded because the Docker build context has no OIDC vars. Fix: `getEnv()` accessor that parses on first call. The pattern is now documented in `docs/features/2026-05-14_web-oidc-login-flow.md` under "Edge Cases" so future Zod-env adds don't repeat the mistake.
+
+Verified live through Caddy on `app.esharevice.com`:
+- Home page: 200, 10.5 KB optimized SSR HTML; Tailwind utilities + Inter font + tracking-tight headings present.
+- `/api/auth/login`: 307 → `https://auth.esharevice.com/application/o/authorize/?…` with PKCE + state + nonce + the **production** redirect URI.
+- `/profile` unauth: 307 → `/api/auth/login?return_to=%2Fprofile`.
+- Bare domain still 301 → app.
+- Both Authentik provider redirect URIs (prod + localhost) were already in the blueprint — no Authentik changes needed.
+
+What's deferred to week 5 polish:
+- Sign-up flow integration (Authentik handles all signup; web's Sign-in button just routes there — but no in-app "Sign up" CTA yet).
+- Mobile bottom-tab bar (the design spec calls for it; currently we only have a top header).
+- Additional pages (Saved, Messages, Exchanges) — all need the API endpoints to exist first.
+- Sentry SDK initialization (DSNs are in env, just need `instrumentation.ts` + `sentry.{client,server,edge}.config.ts`).
 
 ### 2026-05-13 00:30 UTC — Week 3 complete: Hono swap + full /v1 API live
 

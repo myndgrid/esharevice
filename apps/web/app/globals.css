@@ -1,66 +1,79 @@
-/* Design tokens come from @esharevice/ui — imported once at the root. */
+/* Tailwind v4 — `@theme` consumes our oklch tokens so utilities like
+ * `bg-bg`, `text-fg`, `border-border`, `bg-accent` map to the CSS variables
+ * defined in @esharevice/ui/styles.css. Both light and dark themes flip
+ * automatically because the variables are scoped to :root / [data-theme="dark"].
+ */
 @import "@esharevice/ui/styles.css";
+@import "tailwindcss";
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-bg-subtle: var(--bg-subtle);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-danger: var(--danger);
+  --color-success: var(--success);
+  --color-ring: var(--ring);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-full: var(--radius-full);
 }
 
-html {
-  -webkit-text-size-adjust: 100%;
-}
+/* Dark mode driver: when [data-theme="dark"] is set on <html> by the
+ * no-flash bootstrap script, flip Tailwind's `dark:` variants too.
+ */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
-body {
-  background: var(--bg);
-  color: var(--fg);
-  font-family:
-    var(--font-inter),
-    system-ui,
-    -apple-system,
-    "Segoe UI",
-    sans-serif;
-  font-size: 16px;
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
-  min-height: 100dvh;
-}
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
 
-a {
-  color: inherit;
-  text-decoration: none;
-}
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
 
-img,
-picture,
-video,
-canvas,
-svg {
-  display: block;
-  max-width: 100%;
-}
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family:
+      var(--font-inter),
+      system-ui,
+      -apple-system,
+      "Segoe UI",
+      sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    min-height: 100dvh;
+  }
 
-button,
-input,
-textarea,
-select {
-  font: inherit;
-  color: inherit;
-  background: none;
-  border: none;
-}
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
 
-button {
-  cursor: pointer;
-}
+  img,
+  picture,
+  video,
+  canvas,
+  svg {
+    display: block;
+    max-width: 100%;
+  }
 
-main {
-  min-height: 100dvh;
-  padding-inline: max(1rem, env(safe-area-inset-left));
-  padding-block-start: env(safe-area-inset-top);
-  padding-block-end: env(safe-area-inset-bottom);
+  button {
+    cursor: pointer;
+  }
 }

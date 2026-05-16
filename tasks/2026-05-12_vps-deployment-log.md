@@ -1,7 +1,7 @@
 # VPS Deployment Log — e-Sharevice (esharevice.com on Hostinger)
 
 **Created:** 2026-05-12 22:00 UTC
-**Last Updated:** 2026-05-16 15:45 UTC
+**Last Updated:** 2026-05-16 16:00 UTC
 **Status:** Stack live; Authentik fully provisioned; typed Hono /v1 API serving real routes
 
 The runbook's prerequisites were sourced from `tasks/.env.creds` (gitignored). The user opted for the "fast path" (option B in the kickoff exchange): use the master credentials once for setup, rotate after. **All four credentials below MUST be rotated** before this is treated as production.
@@ -474,3 +474,12 @@ Production `https://esharevice.com/` mobile audit went from 86 / 92 / 96 / 100 t
 - **Images:** API `ghcr.io/myndgrid/esharevice-api:1ac0572` (`sha256:5f70019a…`), web `ghcr.io/myndgrid/esharevice-web:1ac0572` (`sha256:6085728f…`). Both built with `--no-cache-filter check`; real layer pushes (4.6 s + 35 s).
 - **Deploy order:** migration → API rolled first (the new endpoints + helper signature change need to be live before any new web bundle calls them) → web rolled after web build finished. Brief window of old web hitting new API was safe — old web doesn't call the new endpoints, doesn't observe the helper signature.
 - **Verification:** image digests on running containers match pushed manifests exactly. `/v1/health` 200, `GET /v1/me/email-prefs` 401 unauth (auth gate working), `POST /v1/email/unsubscribe` w/ unknown token 404 (token gate working), `/settings/notifications` 307 unauth (auth redirect), `/unsubscribe?token=<uuid>&c=new_message` 200 (renders "Confirm unsubscribe" card), `/unsubscribe?token=nope&c=new_message` 200 (renders "Invalid unsubscribe link" card). No new Sentry issues.
+
+### 2026-05-16 16:00 UTC — next/image migration with R2 variant-aware loader
+
+- **What shipped:** four CDN-sourced `<img>` tags swapped to `<Image>` (home feed card, saved feed card, item detail hero, edit form's current photo); a global custom `loaderFile` rewrites Next's srcset URLs to the closest pre-built R2 variant (400/800/1600.webp). Web-only change; API unchanged. Full design + gotchas in [docs/features/2026-05-16_next-image-migration.md](../docs/features/2026-05-16_next-image-migration.md).
+- **Why global loader and not `loader=` prop:** server components can't pass functions to client components — `<Image loader={fn}>` from a server component throws `Functions cannot be passed directly to Client Components`. Setting `images.loaderFile` in `next.config.mjs` inlines the loader into Next's client bundle so callers only pass serialisable props.
+- **Two blob-URL `<img>`s stayed put:** the create + edit form previews render `URL.createObjectURL` blob URLs that never reach the network. `next/image` doesn't optimise blob URLs so the migration there is no-op.
+- **Image:** `ghcr.io/myndgrid/esharevice-web:c18ade3` (`sha256:9672af89…`), built with `--no-cache-filter check`; real layer push. API image untouched (still `5f70019a…`).
+- **Deploy:** web-only `docker compose up -d --force-recreate web`. Healthy in ~7 s. No DB migration, no env changes.
+- **Verification:** running web container digest matches push exactly. `https://esharevice.com/` returns 200 with a srcset containing all three variants (400/800/1600) — confirms the global loader is rewriting URLs in production. Direct CDN URLs (no `/_next/image` proxy roundtrip).

@@ -1,7 +1,7 @@
 # Task: TypeScript Migration & Frontend Redesign Plan
 
 **Created:** 2026-05-11 00:00 UTC
-**Last Updated:** 2026-05-16 15:45 UTC
+**Last Updated:** 2026-05-16 16:00 UTC
 **Status:** v3.4 — weeks 1-3 shipped + first web slice live (OIDC login + design system + home/profile pages)
 
 ---
@@ -999,6 +999,10 @@ These are isolated, reversible, low-risk fixes that don't require the new stack:
 ---
 
 ## Progress Log
+
+### 2026-05-16 16:00 UTC — next/image migration with R2 variant-aware loader
+
+Closes the image-pipeline loop: the upload pipeline produces 400/800/1600.webp variants per image, but the web app was hard-coded to the 800w default, over-fetching by ~4× on mobile card slots. Four CDN-sourced `<img>` tags swapped to `<Image>`; a global `loaderFile` in `next.config.mjs` rewrites Next's srcset URLs to the closest pre-built variant per requested width. Two blob-URL `<img>`s stayed (create + edit form previews — local-only, can't be optimised). Implementation gotcha captured in the feature doc: `loader=` prop crosses the RSC boundary and breaks with "Functions cannot be passed directly to Client Components" — global `loaderFile` is the workaround. Deployed as `c18ade3`. Production srcset confirmed to contain all three variants; URLs go direct to `cdn.esharevice.com` (no `/_next/image` proxy roundtrip).
 
 ### 2026-05-16 15:45 UTC — Email preferences + unsubscribe footer
 

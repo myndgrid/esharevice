@@ -14,15 +14,34 @@ const EnvSchema = z.object({
   // Cloudflare R2 — optional at boot so dev/test can run without uploads wired.
   // If any of {account_id, access_key, secret, bucket} are absent the upload
   // endpoint returns 503; everything else still works.
-  R2_ACCOUNT_ID: z.string().optional(),
-  R2_ACCESS_KEY_ID: z.string().optional(),
-  R2_SECRET_ACCESS_KEY: z.string().optional(),
-  R2_BUCKET: z.string().optional(),
+  // `.transform(undefined-on-empty)` lets docker-compose pass `${VAR:-}`
+  // (empty string when unset) without tripping Zod — empty == absent here.
+  R2_ACCOUNT_ID: z
+    .string()
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : undefined)),
+  R2_ACCESS_KEY_ID: z
+    .string()
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : undefined)),
+  R2_SECRET_ACCESS_KEY: z
+    .string()
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : undefined)),
+  R2_BUCKET: z
+    .string()
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : undefined)),
   // Public URL prefix for image variants. Examples:
   //   https://cdn.esharevice.com         (custom domain bound to the R2 bucket)
   //   https://pub-<hash>.r2.dev          (default R2 dev URL)
   // The API composes URLs as `${CDN_BASE_URL}/<img_key>/<width>.webp`.
-  CDN_BASE_URL: z.string().url().optional(),
+  // Validate as a URL only when actually set — empty string == absent.
+  CDN_BASE_URL: z
+    .string()
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : undefined))
+    .pipe(z.string().url().optional()),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

@@ -199,18 +199,26 @@ route.openapi(
       throw new HTTPException(409, { message: "Already reserved" });
     }
 
+    // Race-safe reservation: the UPDATE is gated on `reserved = false`, so two
+    // simultaneous reserve calls for the same item from different users can
+    // never both succeed — the second one returns zero rows and falls through
+    // to a 409. The pre-read above is still useful for the "Cannot reserve
+    // your own item" branch where the right answer is a 409, not "lost race".
     const updated = await db
       .update(exchangeItems)
       .set({
         reserved: true,
         reserved_by: u.id,
-        reserved_at: row.reserved_at ?? new Date(),
+        reserved_at: new Date(),
         updated_at: new Date(),
       })
-      .where(eq(exchangeItems.id, id))
+      .where(and(eq(exchangeItems.id, id), eq(exchangeItems.reserved, false)))
       .returning();
     const u2 = updated[0];
-    if (!u2) throw new HTTPException(500, { message: "update returned no rows" });
+    if (!u2) {
+      // Someone else won the race in the gap between our read and write.
+      throw new HTTPException(409, { message: "Already reserved" });
+    }
     return c.json(toApiItem(u2), 200);
   },
 );
@@ -245,18 +253,12 @@ route.openapi(
       "`/1600.webp` (or `/400.webp`) to opt into other widths — the pattern is stable.",
     security: [{ Bearer: [] }],
     middleware: [requireAuth, idempotency()] as const,
-    request: {
-      params: IdParamSchema,
-      body: {
-        content: {
-          "multipart/form-data": {
-            schema: z.object({
-              image: z.unknown().openapi({ type: "string", format: "binary" }),
-            }),
-          },
-        },
-      },
-    },
+    // No `request.body` schema — declaring it makes @hono/zod-openapi run its
+    // built-in validator against the body, which CONSUMES the multipart stream
+    // (the request body is a one-shot ReadableStream in Node/undici). The
+    // handler then can't re-read it and 400s with "Body has already been read".
+    // The OpenAPI spec still describes the body via the `description` field.
+    request: { params: IdParamSchema },
     responses: {
       200: { description: "Uploaded", content: { "application/json": { schema: ImageUploadResponseSchema } } },
       400: { description: "Invalid upload", content: problemContent },
@@ -291,14 +293,20 @@ route.openapi(
       throw new HTTPException(403, { message: "Only the item owner can upload an image" });
     }
 
-    let form: FormData;
+    // Hono's purpose-built multipart parser. Reads the body once, caches the
+    // parsed parts on the context so middleware ordering is no longer fragile.
+    let body: Record<string, string | File>;
     try {
-      form = await c.req.raw.formData();
-    } catch {
-      throw new HTTPException(400, { message: "Invalid multipart body" });
+      body = (await c.req.parseBody()) as Record<string, string | File>;
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      const ct = c.req.header("content-type") ?? "(none)";
+      throw new HTTPException(400, {
+        message: `Invalid multipart body: ${detail} [content-type=${ct}]`,
+      });
     }
 
-    const file = form.get("image");
+    const file = body.image;
     if (!(file instanceof File)) {
       throw new HTTPException(400, { message: "Missing `image` field" });
     }

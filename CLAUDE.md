@@ -908,6 +908,12 @@ Categories: `[Logic]` `[Null]` `[Memory]` `[Concurrency]` `[Type]` `[Network]` `
 
 ---
 
+### [Build] Next 15 Server Actions Cap Request Body at 1 MB
+**Description:** A Next 15 server action that takes a `FormData` containing any non-trivial file silently 500s with `Error: Body exceeded 1 MB limit` on the SERVER (visible in container logs as `digest: '<hash>'@<digest>`) — the browser sees only Next's stock "Application error: a server-side exception has occurred" page. There's no client-side hint that the cap was hit; users land on a dead-end error page after pressing Submit. Default cap is 1 MB regardless of what your application logic is prepared to handle.
+**Avoid:** Set `experimental.serverActions.bodySizeLimit` in `next.config.mjs` to slightly above your application's own size cap (e.g. `'11mb'` for a 10 MB image upload). Let the server action handler — not the framework — return the 413; that way the user gets a real error message instead of a digest. Also: if the action handler is going to receive `File` inputs at all, ALWAYS audit this config first; the default is "no upload features can exist."
+
+---
+
 ### [Build] Docker Single-File Bind Mount Pins to Inode — `git pull` Silently Breaks It
 **Description:** `docker compose` bind-mounting a SINGLE FILE (not a directory) — e.g. `./Caddyfile:/etc/caddy/Caddyfile:ro` — resolves to the file's inode at mount time. When a tool like `git pull` (or `git checkout`, `git stash pop`, any "unlink + create" sequence) replaces the file, the **new file gets a new inode**; the container's bind mount keeps pointing at the now-orphaned old inode. Net effect: the host shows the new content (`cat` on the host is fine), but inside the container `cat /etc/caddy/Caddyfile` shows the old content, AND `caddy reload` re-reads the old content — so the running config never updates even though every command claims success.
 **Avoid:** After any `git pull` (or similar inode-changing edit) on the host, **recreate the consuming container**: `docker compose up -d --force-recreate <svc>`. The reload-without-recreate pattern only works for in-place edits (sed -i, manual editor save). Alternatively: bind-mount the parent directory and reference the file inside (`./caddy:/etc/caddy:ro`), since directory mounts follow the path rather than the inode. Symptom is sneaky: the validate succeeds, the reload command reports success, every observability surface lies — only an external curl against the running service exposes the staleness.

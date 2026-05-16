@@ -138,9 +138,17 @@ export const api = {
     return call("/v1/exchange-items", ExchangeItem, opts);
   },
 
-  uploadExchangeItemImage: (id: string, file: File, idempotencyKey?: string) => {
+  uploadExchangeItemImage: (
+    id: string,
+    blob: Blob,
+    filename: string,
+    idempotencyKey?: string,
+  ) => {
     const fd = new FormData();
-    fd.append("image", file);
+    // FormData.append with (name, blob, filename) is the contract that
+    // produces a multipart part with a `filename=` attribute — Hono's
+    // formData() parser wants that to treat it as a file vs. a string field.
+    fd.append("image", blob, filename);
     const opts: Options = { method: "POST", formBody: fd, authed: true, revalidate: false };
     if (idempotencyKey) opts.idempotencyKey = idempotencyKey;
     return call(`/v1/exchange-items/${id}/image`, ExchangeItem, opts);

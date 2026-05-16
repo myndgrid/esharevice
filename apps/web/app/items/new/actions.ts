@@ -56,7 +56,16 @@ export async function createItemAction(
   const file = formData.get("image");
   if (file instanceof File && file.size > 0) {
     try {
-      await api.uploadExchangeItemImage(id, file, `${idempotencyKey}-image`);
+      // Re-materialise the File from a Buffer. The File that comes out of a
+      // Next 15 server action's FormData is backed by a one-shot stream; when
+      // we re-append it to a fresh FormData and hand that to fetch(), undici
+      // sometimes produces a malformed multipart body (the API then 400s with
+      // "Invalid multipart body"). Reading the bytes here once + wrapping in a
+      // new Blob with the right type produces a deterministic, re-readable
+      // body that undici serialises cleanly.
+      const bytes = await file.arrayBuffer();
+      const blob = new Blob([bytes], { type: file.type || "application/octet-stream" });
+      await api.uploadExchangeItemImage(id, blob, file.name || "image", `${idempotencyKey}-image`);
     } catch (err) {
       // The row exists but the image didn't land. Redirect with a flash hint.
       const reason =

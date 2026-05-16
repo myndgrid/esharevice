@@ -1,7 +1,7 @@
 # VPS Deployment Log — e-Sharevice (esharevice.com on Hostinger)
 
 **Created:** 2026-05-12 22:00 UTC
-**Last Updated:** 2026-05-16 14:55 UTC
+**Last Updated:** 2026-05-16 15:19 UTC
 **Status:** Stack live; Authentik fully provisioned; typed Hono /v1 API serving real routes
 
 The runbook's prerequisites were sourced from `tasks/.env.creds` (gitignored). The user opted for the "fast path" (option B in the kickoff exchange): use the master credentials once for setup, rotate after. **All four credentials below MUST be rotated** before this is treated as production.
@@ -448,3 +448,19 @@ Production `https://esharevice.com/` mobile audit went from 86 / 92 / 96 / 100 t
 - **Verification:** `/v1/health` 200, `/v1/conversations/unread-count` 401 unauth (route wired, auth gating), `/` 200, image digests on running containers match the pushed manifests exactly.
 - **Sentry triage — deploy-window artifacts:** Two web-side errors landed at 14:52 UTC (~2 min after the force-recreate) on a real user mid-session on conversation `062ea8cc-…`: WEB-1 (`502 Request failed` from server-rendering the messages page during the API container restart gap) and WEB-2 (`SocketError: other side closed → failed to pipe response` on the open SSE proxy when the API was killed). Both are unavoidable transient artifacts of single-replica force-recreate — fixed paths: SSE clients auto-reconnect, page reload re-fetches. Worth quieting Sentry noise on `SocketError: other side closed` from the SSE proxy in a follow-up; not load-bearing.
 - **Stale Sentry issues:** ESHAREVICE-API-1/2/3 (the conversations 500-cascade trio) all last seen 13:35–13:52 UTC, well before the 14:35 B-2 deploy. Safe to mark resolved in the Sentry UI — fixes have held.
+
+### 2026-05-16 15:05 UTC — SSE proxy: swallow expected upstream-disconnect errors
+
+- **What shipped:** web-only fix wrapping the conversation SSE proxy's `upstream.body` in a `ReadableStream` that closes cleanly on the known transient-disconnect signatures (`SocketError: other side closed`, `TypeError: terminated`, `AbortError`) — these are emitted by undici when the API container restarts mid-stream or the browser tab navigates away. Unknown errors still surface to Sentry so a real regression isn't silenced.
+- **Why:** the 14:52 UTC Sentry artifacts (WEB-2 "failed to pipe response") traced to undici emitting `SocketError: other side closed` when the API force-recreate killed an open SSE connection. EventSource auto-reconnects on the client side, so this is expected, not actionable — but the noise drowns real signal.
+- **Image:** `ghcr.io/myndgrid/esharevice-web:738b221` (`sha256:7ce84566…`), built with `--no-cache-filter check` (real 21.2 s layer push). API image unchanged.
+- **Deploy:** web-only `docker compose up -d --force-recreate web`. API + datastores untouched. Healthy in 7 s.
+
+### 2026-05-16 15:19 UTC — Messages Phase B-4 (per-conversation unread badges)
+
+- **What shipped:** the `/messages` list now shows a small red `9+`-capped badge + bolded other-party name + bolded preview on threads with unread messages. Conversation response shape gains a required `unread_count` field — drives both this list-view UI and any future per-thread treatment (mark-as-unread, etc.).
+- **Schema change:** `packages/shared` `Conversation` Zod schema now requires `unread_count: z.number().int().nonnegative()`. Backward compatibility: old clients ignore unknown fields (Zod default), so an old web bundle calling the new API just discards the new field; a new web bundle hitting the old API would Zod-fail on the missing field — handled by rolling API first, then web.
+- **SQL:** `GET /v1/conversations` list handler now runs a third batched aggregate after the existing previews + other-party joins — `COUNT(*) GROUP BY conversation_id` over the same SQL the global unread-count endpoint uses, scoped to the current page's conv IDs. `GET /v1/conversations/{id}` runs a single-conversation variant. `POST start-conversation` short-circuits with 0 (fresh thread, no messages).
+- **Images:** API `ghcr.io/myndgrid/esharevice-api:bb7640b` (`sha256:f3d678a8…`), web `ghcr.io/myndgrid/esharevice-web:bb7640b` (`sha256:91242d63…`). Both built with `--no-cache-filter check`.
+- **Deploy:** API rolled first (force-recreate api), then web after web build finished — Zod-validation contract requires the API response to include `unread_count` before the new web bundle starts parsing responses. Brief overlap of old web hitting new API was safe (Zod strips the unknown field).
+- **Verification:** both image digests on running containers match the pushed manifests exactly. `/v1/health` 200, `/` 200, `/messages` 307 (auth redirect — correct for unauthed curl). No new Sentry issues.

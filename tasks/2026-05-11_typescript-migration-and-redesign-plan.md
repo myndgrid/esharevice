@@ -1,7 +1,7 @@
 # Task: TypeScript Migration & Frontend Redesign Plan
 
 **Created:** 2026-05-11 00:00 UTC
-**Last Updated:** 2026-05-16 14:55 UTC
+**Last Updated:** 2026-05-16 15:19 UTC
 **Status:** v3.4 — weeks 1-3 shipped + first web slice live (OIDC login + design system + home/profile pages)
 
 ---
@@ -999,6 +999,14 @@ These are isolated, reversible, low-risk fixes that don't require the new stack:
 ---
 
 ## Progress Log
+
+### 2026-05-16 15:19 UTC — Messages Phase B-4: per-conversation unread badges
+
+Builds on the B-3 columns + global unread endpoint. `Conversation` shared schema gains required `unread_count`; `GET /v1/conversations` list handler adds a third batched aggregate (GROUP BY conversation_id) over the same SQL the unread-count endpoint uses; `GET /v1/conversations/{id}` fills the same field with a one-row variant. The `/messages` list UI renders a red `9+`-capped badge alongside each thread's other-party name + bolds the name + preview when unread > 0. Rolled API first, then web (Zod requires the new field on response parsing); old web hitting new API is safe via Zod's unknown-key drop. Deployed as `bb7640b`. Lint + typecheck + 16/16 vitest green.
+
+### 2026-05-16 15:05 UTC — SSE proxy: silence expected upstream-disconnect noise
+
+Web-only fix. The conversation SSE proxy now wraps `upstream.body` in a `ReadableStream` that closes cleanly on the known transient-disconnect signatures (`SocketError: other side closed`, `TypeError: terminated`, `AbortError`) instead of letting them bubble through Next's response-pipe layer as `failed to pipe response` → Sentry. Unknown errors still surface so a real regression isn't silenced. Addresses the 14:52 UTC Sentry artifacts captured during the unread-badge deploy. Deployed as `738b221`.
 
 ### 2026-05-16 14:55 UTC — Messages Phase B-3: unread-message badge
 

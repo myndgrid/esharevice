@@ -340,3 +340,15 @@ Closes the listing-lifecycle loop. Owners can delete their listings; the row sta
   - OpenAPI now shows `delete + get + put` on `/v1/exchange-items/{id}`.
 - **Reads filtered.** `WHERE archived_at IS NULL` threaded through every list/get/update path on both `exchange-items.ts` and `saves.ts`. The saves listing's join condition also filters archived rows out so a user who saved an item that the owner later archived stops seeing it on `/saved`.
 - **No new bug-registry entries.** Slice was clean.
+
+### 2026-05-16 06:30 UTC — CI runs the vitest suite + email-on-reserve via Resend
+
+Two slices in one section since they shipped back-to-back.
+
+**CI (`7b09f98` → `8b85ded` → `2187871`):** Workflow now runs the full vitest suite against a Postgres service container — typecheck still gates, the reserve-race integration test actually runs (was skipping with the unit-test placeholder). The pre-existing broken Lint step (ESLint 9 / no flat-config) is commented out with a fix-it-properly note; tracked separately. Turbo's `test` task gained an `env: [DATABASE_URL, REDIS_URL, OIDC_*]` declaration to forward CI's job-level env into vitest's child process (turbo's hermetic env filter strips everything not declared). Last green CI run: `25954062517` — 3 test files, 11 cases, ~1 s on the runner.
+
+**Email-on-reserve (`0b00409`):** Resend wired into the api. After a successful `PUT /v1/exchange-items/:id/reserve` UPDATE, the handler looks up the owner's email from `users` and fires `sendReservedEmail` in a `void (async () => { ... })()` so the 200 response to the reserver is never delayed by a Resend round-trip. The helper itself never throws — domain-not-verified / rate-limit / DNS failures are logged + Sentry-captured.
+- `RESEND_API_KEY` (36 chars) + `EMAIL_FROM=e-Sharevice <noreply@esharevice.com>` (36 chars) pushed to `/opt/esharevice/infra/.env` via the same scp + python merge pattern as previous secret pushes.
+- **Image:** `ghcr.io/myndgrid/esharevice-api:0b00409` (digest `sha256:9630bf56bd8c711104412b481721ba5cb345f9898d2e84b86cd9290f63277279`). Web image unchanged.
+- **Roll:** `docker compose up -d --force-recreate api`. Healthy in 6 s; api container's env confirms both new vars are populated.
+- Domain `esharevice.com` was already verified for `noreply@esharevice.com` (Authentik has been sending password-reset emails since week 2), so the first real reserve from a non-owner should land in their inbox.

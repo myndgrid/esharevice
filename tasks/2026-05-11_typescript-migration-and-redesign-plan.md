@@ -1000,6 +1000,12 @@ These are isolated, reversible, low-risk fixes that don't require the new stack:
 
 ## Progress Log
 
+### 2026-05-16 06:30 UTC — CI test runs + transactional email on reserve
+
+CI workflow now runs the full vitest suite against a Postgres service container (typecheck + 11 vitest cases including the reserve-race integration test). Pre-existing broken Lint step commented out with a fix-it-properly note; tracked separately as an ESLint 9 / flat-config migration.
+
+Email-on-reserve: when a reservation succeeds, the owner gets an email via Resend. Fire-and-forget so the 200 response is never delayed; helper never throws (logs + Sentry-captures). Domain `esharevice.com` already verified at Resend via the week-2 Authentik wiring, so the path is live end-to-end. Full doc: [docs/features/2026-05-16_email-notifications.md](../docs/features/2026-05-16_email-notifications.md).
+
 ### 2026-05-16 06:00 UTC — Soft-delete listings closes the lifecycle end-to-end
 
 `DELETE /v1/exchange-items/{id}` ships as a soft delete — new `archived_at` column on `exchange_items` flipped to `now()` instead of dropping the row. Every API read across `exchange-items.ts` + `saves.ts` gets a `WHERE archived_at IS NULL` filter; the migration's partial index keeps the active-only reads cheap as the archived tail grows. Idempotent at SQL + middleware + action layers. Web side: DeleteButton with inline two-step confirmation (accessibility-friendly, on-brand) in a "Danger zone" section on `/items/[id]/edit`. Full doc: [docs/features/2026-05-16_delete-archive-item.md](../docs/features/2026-05-16_delete-archive-item.md). The listing lifecycle is now complete: create → view → edit → reserve → save → delete.

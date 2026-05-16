@@ -1,7 +1,7 @@
 # Task: TypeScript Migration & Frontend Redesign Plan
 
 **Created:** 2026-05-11 00:00 UTC
-**Last Updated:** 2026-05-16 17:47 UTC
+**Last Updated:** 2026-05-16 18:18 UTC
 **Status:** v3.4 — weeks 1-3 shipped + first web slice live (OIDC login + design system + home/profile pages)
 
 ---
@@ -999,6 +999,10 @@ These are isolated, reversible, low-risk fixes that don't require the new stack:
 ---
 
 ## Progress Log
+
+### 2026-05-16 18:18 UTC — Auth-CI unblocked: 5-URL Lighthouse coverage live
+
+`/sc:analyze` triggered a server-log dive on the parked `request_id` from the consent failure. Root cause: Authentik configures `CSRF_HEADER_NAME = HTTP_X_AUTHENTIK_CSRF` — the actual HTTP header is `X-Authentik-CSRF`, not Django's stock `X-CSRFToken`. One-line fix to the puppeteerScript unblocked the entire flow. Shipped: `scripts/lighthouse-auth.cjs` drives Authentik's flow-executor JSON API end-to-end and injects the resulting session cookies into Puppeteer; `lighthouserc.json` audits 5 URLs (home, item-detail, `/messages`, `/items/new`, `/settings/notifications`); CI workflow passes `LH_USER` + `LH_PASSWORD` via repo secrets; new bug-registry entry captures the CSRF gotcha + the server-log diagnostic path.
 
 ### 2026-05-16 17:47 UTC — Lighthouse CI: public /items/[id] added; auth-CI parked
 

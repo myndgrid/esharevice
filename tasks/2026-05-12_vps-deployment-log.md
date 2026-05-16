@@ -1,7 +1,7 @@
 # VPS Deployment Log — e-Sharevice (esharevice.com on Hostinger)
 
 **Created:** 2026-05-12 22:00 UTC
-**Last Updated:** 2026-05-16 17:47 UTC
+**Last Updated:** 2026-05-16 18:18 UTC
 **Status:** Stack live; Authentik fully provisioned; typed Hono /v1 API serving real routes
 
 The runbook's prerequisites were sourced from `tasks/.env.creds` (gitignored). The user opted for the "fast path" (option B in the kickoff exchange): use the master credentials once for setup, rotate after. **All four credentials below MUST be rotated** before this is treated as production.
@@ -514,3 +514,11 @@ Sentry triage: ESHAREVICE-WEB-3 at 15:14:26 UTC — `ApiError: /v1/conversations
 - **No-deploy item.** Lighthouse runs in GitHub Actions post-push against the already-live site. Adding URLs doesn't ship anything new to the VPS — it just expands what regressions CI catches on the next push to main.
 - **Auth-CI follow-up (parked).** Tried two approaches to make Lighthouse audit `/items/new` + `/messages` + `/settings/notifications`: (a) Puppeteer clicking the Authentik form — blocked on Lit shadow-DOM rendering with light-DOM decoy inputs at `top: -2000`; (b) flow-executor JSON API — got through identification + password stages cleanly, blocked at consent submission with `ak-stage-flow-error` and only a `request_id`. The `lh-bot` Authentik user is provisioned (pk=8); credentials in `.env.creds`. To unblock: SSH the VPS, `docker logs esharevice-authentik-server-1 | grep <request_id>` to surface the actual server-side exception. Full triage in [docs/features/2026-05-16_lighthouse-ci-public-routes.md](../docs/features/2026-05-16_lighthouse-ci-public-routes.md).
 - **Brittleness call-out:** the original scope estimate flagged this as "brittle (Authentik form selectors can change)" — the warning landed. Defaulting to parking when the second approach hits a wall is the right move; chasing a third would be sunk-cost reasoning.
+
+### 2026-05-16 18:18 UTC — Auth-CI unblocked + shipped
+
+- **What changed since the 17:47 park:** `/sc:analyze` triggered a server-log dive on the parked `request_id`. The Authentik server log showed the actual exception: `rest_framework.exceptions.PermissionDenied: CSRF Failed: CSRF token missing`. Diagnosed via `docker exec <authentik> python -c "...settings.CSRF_HEADER_NAME"` — Authentik configures `CSRF_HEADER_NAME = HTTP_X_AUTHENTIK_CSRF` (HTTP header `X-Authentik-CSRF`), not Django's stock `X-CSRFToken`. One-line fix to the puppeteerScript unblocked the flow.
+- **What shipped:** `scripts/lighthouse-auth.cjs` — drives Authentik's flow-executor JSON API end-to-end (identification → password → consent → callback) and injects the resulting `esharevice_session` + `esharevice_at` cookies into the Puppeteer browser context. `lighthouserc.json` now audits 5 URLs (was 2): home, item-detail, `/messages`, `/items/new`, `/settings/notifications`. CI workflow passes `LH_USER` + `LH_PASSWORD` from repo secrets into the `treosh/lighthouse-ci-action` env. Both secrets set via `gh secret set` against the repo.
+- **New bug-registry entry:** `[Security] Authentik Uses a Non-Default CSRF Header Name on /api/v3/flows/executor/*` — captures the diagnostic path (server-log grep for the opaque request_id) and the fix. Counter 47 → 48.
+- **No production deploy.** CI-only change; takes effect on the next push to main, which will be this commit set.
+- **Verification target:** the next push triggers the CI lighthouse job, which runs the auth script against production, audits all 5 URLs, and asserts the per-category score thresholds. Watch the job summary for the per-URL temporary-public-storage report link.

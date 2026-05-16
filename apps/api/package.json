@@ -9,9 +9,12 @@
     "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --max-warnings 0",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "clean": "rm -rf dist .turbo"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1048.0",
     "@esharevice/db": "workspace:*",
     "@esharevice/shared": "workspace:*",
     "@hono/node-server": "^1.13.7",
@@ -20,8 +23,10 @@
     "drizzle-orm": "^0.38.3",
     "hono": "^4.6.14",
     "hono-rate-limiter": "^0.4.2",
+    "ioredis": "^5.10.1",
     "jose": "^5.9.6",
     "pino": "^9.5.0",
+    "sharp": "^0.34.5",
     "tsx": "^4.19.2",
     "zod": "^3.24.1"
   },

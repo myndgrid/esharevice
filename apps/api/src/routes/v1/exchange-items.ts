@@ -4,8 +4,11 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { getDb, exchangeItems, type ExchangeItemRow } from "@esharevice/db";
 import { CursorQuery, ExchangeItem, ExchangeItemCreate, cursorPage } from "@esharevice/shared";
 import { attachAuth, requireAuth } from "../../middleware/auth.js";
+import { idempotency } from "../../middleware/idempotency.js";
 import { decodeCursor, encodeCursor } from "../../lib/cursor.js";
 import { imgUrlFromKey } from "../../lib/image-url.js";
+import { r2Configured } from "../../env.js";
+import { ALLOWED_MIME_TYPES, MAX_UPLOAD_BYTES, processAndUpload } from "../../lib/sharp-pipeline.js";
 import type { AppEnv } from "../../app.js";
 
 const route = new OpenAPIHono<AppEnv>();
@@ -131,7 +134,7 @@ route.openapi(
     tags: ["exchange-items"],
     summary: "Create an exchange item owned by the authenticated user.",
     security: [{ Bearer: [] }],
-    middleware: [requireAuth] as const,
+    middleware: [requireAuth, idempotency()] as const,
     request: {
       body: { content: { "application/json": { schema: ItemCreateSchema } } },
     },
@@ -172,7 +175,7 @@ route.openapi(
     tags: ["exchange-items"],
     summary: "Reserve an exchange item for the authenticated user.",
     security: [{ Bearer: [] }],
-    middleware: [requireAuth] as const,
+    middleware: [requireAuth, idempotency()] as const,
     request: { params: IdParamSchema },
     responses: {
       200: { description: "Reserved", content: { "application/json": { schema: ItemSchema } } },
@@ -202,6 +205,131 @@ route.openapi(
         reserved: true,
         reserved_by: u.id,
         reserved_at: row.reserved_at ?? new Date(),
+        updated_at: new Date(),
+      })
+      .where(eq(exchangeItems.id, id))
+      .returning();
+    const u2 = updated[0];
+    if (!u2) throw new HTTPException(500, { message: "update returned no rows" });
+    return c.json(toApiItem(u2), 200);
+  },
+);
+
+// ─────────────────────── POST /v1/exchange-items/:id/image
+//
+// Multipart upload of a single image. sharp resizes to three .webp variants
+// (1600/800/400), each uploaded to R2 keyed by sha256(original-bytes)/<width>.webp.
+// The row's img_key + img_hash are updated to point at the new content.
+//
+// Defensive choices:
+// - Length cap is enforced BEFORE the body is buffered (Content-Length header)
+//   AND again after (buffer.byteLength) — header is advisory, only the post-read
+//   check is authoritative.
+// - MIME allowlist (jpeg/png/webp) rejected at the multipart-parse layer.
+// - Idempotency is provided by the content-hashed keys naturally; the
+//   Idempotency-Key middleware is layered on top so a retried request
+//   replays the cached row instead of re-running sharp.
+// - 503 if R2 isn't configured (env-gated) so the rest of the API stays usable
+//   during the bootstrap window before the dashboard step is done.
+const ImageUploadResponseSchema = ItemSchema.openapi("ExchangeItemAfterUpload");
+route.openapi(
+  createRoute({
+    method: "post",
+    path: "/exchange-items/{id}/image",
+    tags: ["exchange-items"],
+    summary: "Upload + process an image for an exchange item.",
+    description:
+      "Multipart/form-data with a single `image` field. Server resizes to " +
+      "1600w / 800w / 400w .webp variants on Cloudflare R2; the row's `img_url` " +
+      "points at the 800w variant by default. Clients may swap `/800.webp` → " +
+      "`/1600.webp` (or `/400.webp`) to opt into other widths — the pattern is stable.",
+    security: [{ Bearer: [] }],
+    middleware: [requireAuth, idempotency()] as const,
+    request: {
+      params: IdParamSchema,
+      body: {
+        content: {
+          "multipart/form-data": {
+            schema: z.object({
+              image: z.unknown().openapi({ type: "string", format: "binary" }),
+            }),
+          },
+        },
+      },
+    },
+    responses: {
+      200: { description: "Uploaded", content: { "application/json": { schema: ImageUploadResponseSchema } } },
+      400: { description: "Invalid upload", content: problemContent },
+      401: { description: "Unauthenticated", content: problemContent },
+      403: { description: "Not the item owner", content: problemContent },
+      404: { description: "Not Found", content: problemContent },
+      413: { description: "Upload too large", content: problemContent },
+      415: { description: "Unsupported media type", content: problemContent },
+      503: { description: "Storage not configured", content: problemContent },
+    },
+  }),
+  async (c) => {
+    if (!r2Configured()) {
+      throw new HTTPException(503, { message: "Image storage is not configured yet" });
+    }
+
+    const u = c.get("user");
+    if (!u) throw new HTTPException(401, { message: "no user attached" });
+    const { id } = c.req.valid("param");
+
+    // Cheap pre-check: refuse before buffering anything if the header lies small.
+    const advertised = Number(c.req.header("content-length"));
+    if (Number.isFinite(advertised) && advertised > MAX_UPLOAD_BYTES) {
+      throw new HTTPException(413, { message: "Upload exceeds 10 MB limit" });
+    }
+
+    const db = getDb();
+    const rows = await db.select().from(exchangeItems).where(eq(exchangeItems.id, id)).limit(1);
+    const row = rows[0];
+    if (!row) throw new HTTPException(404, { message: "Not Found" });
+    if (row.user_id !== u.id) {
+      throw new HTTPException(403, { message: "Only the item owner can upload an image" });
+    }
+
+    let form: FormData;
+    try {
+      form = await c.req.raw.formData();
+    } catch {
+      throw new HTTPException(400, { message: "Invalid multipart body" });
+    }
+
+    const file = form.get("image");
+    if (!(file instanceof File)) {
+      throw new HTTPException(400, { message: "Missing `image` field" });
+    }
+    if (!ALLOWED_MIME_TYPES.has(file.type)) {
+      throw new HTTPException(415, {
+        message: `Unsupported media type ${file.type || "(none)"} — allowed: ${[...ALLOWED_MIME_TYPES].join(", ")}`,
+      });
+    }
+    const buf = Buffer.from(await file.arrayBuffer());
+    if (buf.byteLength > MAX_UPLOAD_BYTES) {
+      throw new HTTPException(413, { message: "Upload exceeds 10 MB limit" });
+    }
+    if (buf.byteLength === 0) {
+      throw new HTTPException(400, { message: "Empty upload" });
+    }
+
+    let processed;
+    try {
+      processed = await processAndUpload(buf);
+    } catch (err) {
+      // sharp throws on malformed input even if the MIME claimed something valid.
+      throw new HTTPException(400, {
+        message: `Could not process image: ${err instanceof Error ? err.message : String(err)}`,
+      });
+    }
+
+    const updated = await db
+      .update(exchangeItems)
+      .set({
+        img_key: processed.hash,
+        img_hash: processed.hash,
         updated_at: new Date(),
       })
       .where(eq(exchangeItems.id, id))

@@ -138,6 +138,14 @@ services:
       OIDC_ISSUER: https://auth.${DOMAIN}/application/o/e-sharevice-web/
       OIDC_AUDIENCE: e-sharevice-web
       OIDC_JWKS_URL: https://auth.${DOMAIN}/application/o/e-sharevice-web/jwks/
+      # Cloudflare R2 — optional; all five must be set together for image uploads to work.
+      # Until you create the S3-compatible R2 token in the dashboard, leave these
+      # blank; POST /v1/exchange-items/:id/image returns 503 until they're filled in.
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
+      R2_BUCKET: ${R2_BUCKET:-esharevice-images}
+      CDN_BASE_URL: ${CDN_BASE_URL:-}
       SENTRY_DSN: ${SENTRY_DSN_API:-}
     depends_on:
       postgres: { condition: service_healthy }

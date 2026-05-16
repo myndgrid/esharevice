@@ -49,20 +49,43 @@ www.{$DOMAIN}, app.{$DOMAIN} {
 	redir https://{$DOMAIN}{uri} 301
 }
 
-# ─────────────────────────────────────────── API (Express, versioned at /v1)
+# ─────────────────────────────────────────── API (Hono, versioned at /v1)
 api.{$DOMAIN} {
-	encode zstd gzip
-
-	header {
-		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
-		X-Content-Type-Options    "nosniff"
-		Referrer-Policy           "no-referrer"
-		-Server
+	# SSE paths get a separate route with response buffering disabled so
+	# events flush to the client in real time instead of being held until
+	# the proxy's default flush threshold. `encode` would also buffer for
+	# compression, so SSE is excluded from gzip/zstd here.
+	@sse path_regexp ^/v1/.*/events/?$
+	handle @sse {
+		header {
+			Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+			X-Content-Type-Options    "nosniff"
+			Referrer-Policy           "no-referrer"
+			-Server
+			# Some intermediaries respect this; harmless if they don't.
+			X-Accel-Buffering         "no"
+		}
+		reverse_proxy api:8080 {
+			header_up X-Real-IP {remote_host}
+			flush_interval -1
+		}
 	}
 
-	# CORS preflight short-circuit (Caddy doesn't add CORS itself — the API does via the `cors` middleware).
-	reverse_proxy api:8080 {
-		header_up X-Real-IP {remote_host}
+	# Everything else: standard JSON API with compression.
+	handle {
+		encode zstd gzip
+
+		header {
+			Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+			X-Content-Type-Options    "nosniff"
+			Referrer-Policy           "no-referrer"
+			-Server
+		}
+
+		# CORS preflight short-circuit (Caddy doesn't add CORS itself — the API does via the `cors` middleware).
+		reverse_proxy api:8080 {
+			header_up X-Real-IP {remote_host}
+		}
 	}
 }
 

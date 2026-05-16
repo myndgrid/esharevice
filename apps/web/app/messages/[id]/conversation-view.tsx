@@ -2,10 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@esharevice/ui";
-import type { Message } from "@esharevice/shared";
+import { Message } from "@esharevice/shared";
 import { fetchMessagesAfterAction, sendMessageAction } from "./actions";
 
-const POLL_INTERVAL_MS = 5_000;
+/**
+ * Polling kicks in only when SSE is unavailable (network, intermediary,
+ * 401). 30 s is sloppy enough to be a fallback without flooding the API.
+ */
+const FALLBACK_POLL_INTERVAL_MS = 30_000;
 const MAX_BODY = 4000;
 
 /**
@@ -40,13 +44,21 @@ export function ConversationView({
     el.scrollTop = el.scrollHeight;
   }, [messages.length]);
 
-  // Polling — fetch only messages newer than the last we have. The API's
-  // cursor-after semantics make this efficient: we send the most recent
-  // message's (created_at, id) and get an empty page when nothing is new.
+  // Primary live channel: SSE through the same-origin proxy at
+  // /api/messages/:id/events. EventSource handles reconnect on its own
+  // (browser-managed exponential backoff). Whenever the connection
+  // opens or re-opens we fire a single catch-up fetch with a
+  // tail-cursor so anything that arrived during a disconnect lands in
+  // the list before the next live event.
+  //
+  // Polling stays around as a fallback: if EventSource never reaches
+  // `OPEN` (network blocks SSE, intermediary buffers, etc.) we still
+  // catch up every 30 s. When SSE is healthy this is dormant.
   useEffect(() => {
     let stopped = false;
+    let sse: EventSource | null = null;
 
-    const tick = async () => {
+    const catchUp = async () => {
       if (stopped) return;
       try {
         const tail = messages[messages.length - 1];
@@ -55,23 +67,39 @@ export function ConversationView({
           : null;
         const fresh = await fetchMessagesAfterAction(conversationId, cursor);
         if (stopped) return;
-        if (fresh.length > 0) {
-          setMessages((prev) => mergeNew(prev, fresh));
-        }
+        if (fresh.length > 0) setMessages((prev) => mergeNew(prev, fresh));
       } catch {
-        // Swallow transient network errors — the next tick will retry.
+        /* transient — next tick / next event will retry */
       }
     };
 
-    const id = setInterval(tick, POLL_INTERVAL_MS);
+    try {
+      sse = new EventSource(`/api/messages/${conversationId}/events`);
+      sse.addEventListener("ready", () => {
+        // Server confirmed the stream is open. Catch up on anything that
+        // arrived between page-render and SSE-open (rare race).
+        void catchUp();
+      });
+      sse.addEventListener("message", (e) => {
+        try {
+          const parsed = Message.parse(JSON.parse((e as MessageEvent<string>).data));
+          setMessages((prev) => mergeNew(prev, [parsed]));
+        } catch {
+          /* malformed event — ignore */
+        }
+      });
+      // EventSource emits 'error' on both transient and terminal failures.
+      // The browser retries automatically; we don't need to do anything.
+    } catch {
+      /* EventSource unavailable — fall through to the poll fallback. */
+    }
+
+    const fallbackTick = setInterval(catchUp, FALLBACK_POLL_INTERVAL_MS);
     return () => {
       stopped = true;
-      clearInterval(id);
+      clearInterval(fallbackTick);
+      if (sse) sse.close();
     };
-    // We INTENTIONALLY don't include `messages` in deps — that would
-    // reset the interval on every send, which defeats the cadence.
-    // The closure reads `messages` via the setMessages callback so it's
-    // always up to date.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]);
 

@@ -1,7 +1,7 @@
 # Task: TypeScript Migration & Frontend Redesign Plan
 
 **Created:** 2026-05-11 00:00 UTC
-**Last Updated:** 2026-05-16 14:27 UTC
+**Last Updated:** 2026-05-16 14:55 UTC
 **Status:** v3.4 — weeks 1-3 shipped + first web slice live (OIDC login + design system + home/profile pages)
 
 ---
@@ -999,6 +999,10 @@ These are isolated, reversible, low-risk fixes that don't require the new stack:
 ---
 
 ## Progress Log
+
+### 2026-05-16 14:55 UTC — Messages Phase B-3: unread-message badge
+
+Closes the visible-state loop on Messages. New `GET /v1/conversations/unread-count` returns `{ total }` — count of messages newer than the viewer's per-conversation `*_last_read_at` minus the viewer's own. Mobile tab bar renders a red `9+`-capped badge on the Messages icon via a Suspense-wrapped server fetcher (`MobileTabBarServer`); unauthed + API-failure paths degrade silently to "no badge". Builds entirely on the B-2 columns; no migration. The static route is registered before `/conversations/{id}` so Hono's radix tree resolves it as a static match. Test asserts the SQL: viewer's own messages excluded, mark-read past the tail drops the count to 0. 16/16 vitest green; lint + typecheck clean; deployed as `e1b2d9d`.
 
 ### 2026-05-16 14:27 UTC — Messages Phase B-2: email-on-new-message
 

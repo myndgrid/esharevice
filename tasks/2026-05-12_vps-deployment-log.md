@@ -1,7 +1,7 @@
 # VPS Deployment Log — e-Sharevice (esharevice.com on Hostinger)
 
 **Created:** 2026-05-12 22:00 UTC
-**Last Updated:** 2026-05-16 14:27 UTC
+**Last Updated:** 2026-05-16 14:55 UTC
 **Status:** Stack live; Authentik fully provisioned; typed Hono /v1 API serving real routes
 
 The runbook's prerequisites were sourced from `tasks/.env.creds` (gitignored). The user opted for the "fast path" (option B in the kickoff exchange): use the master credentials once for setup, rotate after. **All four credentials below MUST be rotated** before this is treated as production.
@@ -436,3 +436,15 @@ Production `https://esharevice.com/` mobile audit went from 86 / 92 / 96 / 100 t
   - Send a message from A → B (B not viewing): inbox should receive the new-message email within seconds.
   - Send the second message from A → B (B viewing): inbox should NOT receive a duplicate.
   - Sentry: no new issues on POST /messages or PATCH /:id/read.
+
+### 2026-05-16 14:55 UTC — Messages Phase B-3 (unread-message badge on the Messages tab)
+
+- **What shipped:** new `GET /v1/conversations/unread-count` returning `{ total: number }` — counts messages newer than the viewer's per-conversation `*_last_read_at` and not authored by themselves; mobile tab bar renders a red `9+`-capped badge on the Messages icon. Builds on the B-2 columns; no migration.
+- **Routing detail:** the new static path is registered before `/conversations/{id}` so Hono's radix tree resolves it as a static match. Verified post-deploy via `GET /v1/openapi.json` listing both `/v1/conversations/unread-count` AND `/v1/conversations/{id}` independently.
+- **UI:** `MobileTabBarServer` (server component) fetches the count + passes it to the client `MobileTabBar`; wrapped in a `<Suspense fallback={<MobileTabBar />}>` so a slow API call doesn't delay first paint. Unauthed visitors and API failures degrade silently to "no badge". `bg-red-600 text-white` for AA contrast without inventing a new design token.
+- **Test coverage:** new vitest case asserting the SQL — viewer's own messages excluded; bumping `*_last_read_at` past the conv tail drops the count to 0; per-participant independence preserved. 16/16 tests green.
+- **Images:** `ghcr.io/myndgrid/esharevice-api:e1b2d9d` (`sha256:f55eb156…`), `ghcr.io/myndgrid/esharevice-web:e1b2d9d` (`sha256:5a54d795…`). Both built with `--no-cache-filter check`; real layer pushes (3.1 s + 30.1 s) — not cached re-tags.
+- **Deploy:** `git pull` + `docker compose up -d --force-recreate api web`. Both healthy within 15 s.
+- **Verification:** `/v1/health` 200, `/v1/conversations/unread-count` 401 unauth (route wired, auth gating), `/` 200, image digests on running containers match the pushed manifests exactly.
+- **Sentry triage — deploy-window artifacts:** Two web-side errors landed at 14:52 UTC (~2 min after the force-recreate) on a real user mid-session on conversation `062ea8cc-…`: WEB-1 (`502 Request failed` from server-rendering the messages page during the API container restart gap) and WEB-2 (`SocketError: other side closed → failed to pipe response` on the open SSE proxy when the API was killed). Both are unavoidable transient artifacts of single-replica force-recreate — fixed paths: SSE clients auto-reconnect, page reload re-fetches. Worth quieting Sentry noise on `SocketError: other side closed` from the SSE proxy in a follow-up; not load-bearing.
+- **Stale Sentry issues:** ESHAREVICE-API-1/2/3 (the conversations 500-cascade trio) all last seen 13:35–13:52 UTC, well before the 14:35 B-2 deploy. Safe to mark resolved in the Sentry UI — fixes have held.

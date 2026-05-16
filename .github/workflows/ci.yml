@@ -104,6 +104,15 @@ jobs:
 
       - name: Run Lighthouse CI against production
         uses: treosh/lighthouse-ci-action@v12
+        env:
+          # Consumed by scripts/lighthouse-auth.cjs (the puppeteerScript
+          # referenced from lighthouserc.json) so it can authenticate as
+          # lh-bot before the auth-gated /messages, /items/new, and
+          # /settings/notifications audits. The script is a no-op when
+          # either is missing, so PR-time runs against forks (which don't
+          # get secrets) still measure the public routes safely.
+          LH_USER: ${{ secrets.LH_USER }}
+          LH_PASSWORD: ${{ secrets.LH_PASSWORD }}
         with:
           configPath: ./lighthouserc.json
           # `temporary-public-storage` uploads the full HTML report and prints

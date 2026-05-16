@@ -1,11 +1,15 @@
 {
-  "_about": "Auth-gated routes (/items/new, /messages, /settings/*) are intentionally NOT audited here — Lighthouse runs headless without session cookies and would just measure the OIDC redirect. Wiring puppeteerScript + a test user in Authentik + GitHub Actions secrets is a separate follow-up; see docs/features/2026-05-16_lighthouse-ci-public-routes.md. /items/<id> is pinned to a stable production listing; if that listing is deleted, update the URL or rotate to another.",
+  "_about": "Auth-gated routes (/messages, /items/new, /settings/notifications) are audited by injecting lh-bot's session cookies via scripts/lighthouse-auth.cjs (puppeteerScript). The script reads LH_USER + LH_PASSWORD env vars — set as GitHub Actions secrets in CI — and is a no-op if either is missing, so local LHCI runs against public URLs still work without secrets. /items/<id> is pinned to a stable production listing (the Lorem Ipsum demo); if that listing is deleted, update the URL or rotate to another. See docs/features/2026-05-16_lighthouse-ci-public-routes.md.",
   "ci": {
     "collect": {
       "url": [
         "https://esharevice.com/",
-        "https://esharevice.com/items/62756a14-5e08-4700-9f4f-1cf9dc14a1bf"
+        "https://esharevice.com/items/62756a14-5e08-4700-9f4f-1cf9dc14a1bf",
+        "https://esharevice.com/messages",
+        "https://esharevice.com/items/new",
+        "https://esharevice.com/settings/notifications"
       ],
+      "puppeteerScript": "./scripts/lighthouse-auth.cjs",
       "numberOfRuns": 2,
       "settings": {
         "preset": "desktop",

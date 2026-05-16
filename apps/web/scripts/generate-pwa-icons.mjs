@@ -19,7 +19,11 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import sharp from "sharp";
-import toIco from "to-ico";
+// `png-to-ico` replaced `to-ico` (which pulled an unmaintained transitive
+// chain — request@2.x, jimp@0.2.x, jpeg-js@0.2.x — that carried CRITICAL CVEs
+// at build time). Same single-call signature: pass an array of PNG Buffers,
+// receive an ICO Buffer.
+import pngToIco from "png-to-ico";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const publicDir = resolve(here, "..", "public");
@@ -125,7 +129,7 @@ async function main() {
     renderTilePng(32, 0.85),
     renderTilePng(48, 0.85),
   ]);
-  const ico = await toIco([px16, px32, px48]);
+  const ico = await pngToIco([px16, px32, px48]);
   await writeFile(resolve(appDir, "favicon.ico"), ico);
   console.log(`  wrote ${resolve(appDir, "favicon.ico")} (16/32/48 multi-res)`);
 

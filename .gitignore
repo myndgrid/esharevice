@@ -58,6 +58,14 @@ Thumbs.db
 *.sw?
 *.swp
 
+# === LOCAL-ONLY TOOL CONFIG ===
+# Claude Code's per-machine settings can contain plaintext credentials in its
+# Bash permission allow rules (E2E_PASSWORD=…). Never commit this directory.
+.claude/
+# gstack writes security reports + checkpoints here. Reports contain file
+# paths + descriptions of attack surface — keep them out of git history.
+.gstack/
+
 # === DATABASE / GENERATED ===
 *.sqlite
 *.sqlite-journal

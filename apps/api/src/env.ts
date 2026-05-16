@@ -42,6 +42,27 @@ const EnvSchema = z.object({
     .optional()
     .transform((v) => (v && v.length > 0 ? v : undefined))
     .pipe(z.string().url().optional()),
+  // Resend transactional email — optional. The owner-notification on
+  // reserve falls back to a no-op when either is empty.
+  RESEND_API_KEY: z
+    .string()
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : undefined)),
+  // FROM address — must be on a domain that's verified in resend.com/domains.
+  // Sends from unverified domains return 403 with `validation_error` and the
+  // helper logs + Sentry-captures rather than failing the originating request.
+  EMAIL_FROM: z
+    .string()
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : undefined)),
+  // Public origin used to build clickable links in emails. Defaults to the
+  // CDN base host (which already encodes the domain); falls back to the
+  // OIDC issuer's origin so links don't 404 if R2 isn't wired yet.
+  WEB_PUBLIC_URL: z
+    .string()
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : undefined))
+    .pipe(z.string().url().optional()),
 });
 
 export type Env = z.infer<typeof EnvSchema>;
@@ -57,4 +78,9 @@ export function r2Configured(): boolean {
       env.R2_BUCKET &&
       env.CDN_BASE_URL,
   );
+}
+
+/** True iff both Resend creds are present. */
+export function emailConfigured(): boolean {
+  return Boolean(env.RESEND_API_KEY && env.EMAIL_FROM);
 }

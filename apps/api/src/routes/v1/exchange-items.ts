@@ -1,7 +1,7 @@
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
-import { getDb, exchangeItems, type ExchangeItemRow } from "@esharevice/db";
+import { getDb, exchangeItems, users, type ExchangeItemRow } from "@esharevice/db";
 import {
   CursorQuery,
   ExchangeItem,
@@ -13,8 +13,9 @@ import { attachAuth, requireAuth } from "../../middleware/auth.js";
 import { idempotency } from "../../middleware/idempotency.js";
 import { decodeCursor, encodeCursor } from "../../lib/cursor.js";
 import { imgUrlFromKey } from "../../lib/image-url.js";
-import { r2Configured } from "../../env.js";
+import { env, r2Configured } from "../../env.js";
 import { ALLOWED_MIME_TYPES, MAX_UPLOAD_BYTES, processAndUpload } from "../../lib/sharp-pipeline.js";
+import { sendReservedEmail } from "../../lib/email.js";
 import type { AppEnv } from "../../app.js";
 
 const route = new OpenAPIHono<AppEnv>();
@@ -310,6 +311,45 @@ route.openapi(
       // Someone else won the race in the gap between our read and write.
       throw new HTTPException(409, { message: "Already reserved" });
     }
+
+    // Fire-and-forget the owner notification. We deliberately don't await
+    // so a slow Resend round-trip can't delay the user's response. Errors
+    // are swallowed inside sendReservedEmail (logged + Sentry-captured)
+    // because a reservation that succeeded at the SQL layer must be
+    // observed as a 200 by the reserver regardless of email-side state.
+    void (async () => {
+      try {
+        const ownerRows = await db
+          .select({
+            email: users.email,
+            first_name: users.first_name,
+            last_name: users.last_name,
+          })
+          .from(users)
+          .where(eq(users.id, row.user_id))
+          .limit(1);
+        const owner = ownerRows[0];
+        if (!owner) return;
+        const reserverName =
+          `${u.first_name ?? ""} ${u.last_name ?? ""}`.trim() || "Someone";
+        const ownerName =
+          `${owner.first_name ?? ""} ${owner.last_name ?? ""}`.trim() || "there";
+        const base = env.WEB_PUBLIC_URL ?? env.OIDC_ISSUER.replace(/\/application\/o\/[^/]+\/?$/, "");
+        await sendReservedEmail({
+          to: owner.email,
+          ownerName,
+          reserverName,
+          itemService: row.service,
+          itemUrl: `${base.replace(/\/$/, "")}/items/${row.id}`,
+        });
+      } catch (err) {
+        // sendReservedEmail already swallows, but defensive belt-and-suspenders
+        // for the email-side helper code itself.
+        // eslint-disable-next-line no-console
+        console.warn("[reserve] notification setup failed:", err);
+      }
+    })();
+
     return c.json(toApiItem(u2), 200);
   },
 );

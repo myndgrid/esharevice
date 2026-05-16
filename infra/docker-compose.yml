@@ -132,7 +132,7 @@ services:
       NODE_ENV: production
       API_PORT: 8080
       API_PUBLIC_URL: https://api.${DOMAIN:?required}
-      WEB_ORIGIN: https://app.${DOMAIN}
+      WEB_ORIGIN: https://${DOMAIN}
       DATABASE_URL: postgresql://${POSTGRES_USER:-esharevice}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-esharevice}
       REDIS_URL: redis://redis:6379
       OIDC_ISSUER: https://auth.${DOMAIN}/application/o/e-sharevice-web/
@@ -160,7 +160,7 @@ services:
       OIDC_ISSUER: https://auth.${DOMAIN}/application/o/e-sharevice-web/
       OIDC_CLIENT_ID: e-sharevice-web
       OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:?required}
-      OIDC_REDIRECT_URI: https://app.${DOMAIN}/api/auth/callback
+      OIDC_REDIRECT_URI: https://${DOMAIN}/api/auth/callback
       SESSION_COOKIE_SECRET: ${SESSION_COOKIE_SECRET:?required}
       SENTRY_DSN: ${SENTRY_DSN_WEB:-}
     depends_on:

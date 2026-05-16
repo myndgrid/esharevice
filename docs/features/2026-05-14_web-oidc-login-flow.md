@@ -1,8 +1,8 @@
 # Feature: Web app + OIDC login flow
 
 **Created:** 2026-05-14 21:00 UTC
-**Last Updated:** 2026-05-14 21:00 UTC
-**Status:** Stable — login is live at app.esharevice.com
+**Last Updated:** 2026-05-15 23:55 UTC
+**Status:** Stable — login is live at esharevice.com (root). The legacy app.esharevice.com hostname 301-redirects to root.
 
 The Next.js web app gets its design system, its layout shell, and a fully working OIDC login flow against Authentik.
 
@@ -164,7 +164,7 @@ NEXT_PUBLIC_API_URL=https://api.esharevice.com   # browser-visible API base
 OIDC_ISSUER=https://auth.esharevice.com/application/o/e-sharevice-web/
 OIDC_CLIENT_ID=e-sharevice-web
 OIDC_CLIENT_SECRET=...                            # from Authentik web provider
-OIDC_REDIRECT_URI=https://app.esharevice.com/api/auth/callback
+OIDC_REDIRECT_URI=https://esharevice.com/api/auth/callback
 SESSION_COOKIE_SECRET=...                         # 32+ chars; openssl rand -hex 32
 ```
 
@@ -174,9 +174,10 @@ In production these come from `infra/.env`; in local dev, set them in `apps/web/
 
 ## Authentik provider configuration
 
-Already provisioned via blueprint (`infra/authentik/blueprints/esharevice.yaml`). The `e-sharevice-web` OAuth2 provider has both redirect URIs registered:
+Already provisioned via blueprint (`infra/authentik/blueprints/esharevice.yaml`). The `e-sharevice-web` OAuth2 provider has three redirect URIs registered:
 
-- `https://app.esharevice.com/api/auth/callback` (production)
+- `https://esharevice.com/api/auth/callback` (production, current)
+- `https://app.esharevice.com/api/auth/callback` (production, legacy — kept registered during the cutover so any in-flight login originating from the old hostname still resolves; safe to remove a few days after the migration once nothing reaches the old callback URL)
 - `http://localhost:3000/api/auth/callback` (local dev)
 
 If we add staging or another environment, add the URI to the blueprint AND re-apply.

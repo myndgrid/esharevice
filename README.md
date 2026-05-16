@@ -1,9 +1,9 @@
 # e-Sharevice
 
-A community skill / item exchange app — TypeScript monorepo. Self-hosted at [esharevice.com](https://app.esharevice.com).
+A community skill / item exchange app — TypeScript monorepo. Self-hosted at [esharevice.com](https://esharevice.com).
 
 **Created:** 2026-05-12 02:00 UTC
-**Last Updated:** 2026-05-13 00:30 UTC
+**Last Updated:** 2026-05-15 23:55 UTC
 **Status:** Weeks 1 + 2 + 3 shipped. Production stack live; typed `/v1` API serving; redesigned web frontend in progress.
 
 ---
@@ -12,7 +12,7 @@ A community skill / item exchange app — TypeScript monorepo. Self-hosted at [e
 
 | Surface | URL |
 |---|---|
-| Web app | https://app.esharevice.com |
+| Web app | https://esharevice.com |
 | API root | https://api.esharevice.com |
 | API health | https://api.esharevice.com/v1/health |
 | OpenAPI spec | https://api.esharevice.com/v1/openapi.json |
@@ -20,7 +20,7 @@ A community skill / item exchange app — TypeScript monorepo. Self-hosted at [e
 | Authentik (OIDC) | https://auth.esharevice.com |
 | Uptime monitoring (basic-auth) | https://uptime.esharevice.com |
 
-Bare-domain and `www.` 301-redirect to `app.esharevice.com`.
+`www.esharevice.com` and `app.esharevice.com` 301-redirect to the root domain.
 
 ---
 

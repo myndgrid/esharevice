@@ -129,7 +129,7 @@ The api fails at boot if any of these are missing or malformed (Zod-parsed):
 NODE_ENV=development|test|production
 API_PORT=8080
 API_PUBLIC_URL=https://api.esharevice.com
-WEB_ORIGIN=https://app.esharevice.com    # comma-separated for multiple
+WEB_ORIGIN=https://esharevice.com        # comma-separated for multiple
 DATABASE_URL=postgresql://...
 REDIS_URL=redis://...
 OIDC_ISSUER=https://auth.esharevice.com/application/o/e-sharevice-web/

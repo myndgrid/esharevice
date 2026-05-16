@@ -1,8 +1,13 @@
 # Caddy 2 — auto-TLS via Let's Encrypt, HTTP/3 by default.
 # Three public hosts in front of the Compose stack:
-#   app.{$DOMAIN}    -> web   (Next.js)
-#   api.{$DOMAIN}    -> api   (Express :8080)
+#   {$DOMAIN}        -> web   (Next.js)         ← app lives at the root domain
+#   api.{$DOMAIN}    -> api   (Hono :8080)
 #   auth.{$DOMAIN}   -> authentik-server :9000 (HTTP) / :9443 (HTTPS)
+#
+# www.{$DOMAIN} and app.{$DOMAIN} permanently 301 to the root domain so old
+# bookmarks keep working. The app.* hostname is kept provisioned (Let's
+# Encrypt cert still issues) so the redirect itself reaches the browser
+# without a TLS error.
 #
 # Plus internal-only hosts behind basic auth (uptime monitoring):
 #   uptime.{$DOMAIN} -> uptime-kuma :3001
@@ -19,15 +24,8 @@
 	}
 }
 
-# ─────────────────────────────────────────── Bare domain + www → app (301 redirect)
-{$DOMAIN}, www.{$DOMAIN} {
-	encode zstd gzip
-	header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
-	redir https://app.{$DOMAIN}{uri} 301
-}
-
-# ─────────────────────────────────────────── Web (Next.js)
-app.{$DOMAIN} {
+# ─────────────────────────────────────────── Web (Next.js) — root domain
+{$DOMAIN} {
 	encode zstd gzip
 
 	header {
@@ -42,6 +40,13 @@ app.{$DOMAIN} {
 	reverse_proxy web:3000 {
 		header_up X-Real-IP {remote_host}
 	}
+}
+
+# ─────────────────────────────────────────── Legacy hostnames → root (301)
+www.{$DOMAIN}, app.{$DOMAIN} {
+	encode zstd gzip
+	header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+	redir https://{$DOMAIN}{uri} 301
 }
 
 # ─────────────────────────────────────────── API (Express, versioned at /v1)

@@ -381,3 +381,12 @@ The last big-ticket product feature lands. Non-owner taps "Message owner" on any
   - OpenAPI advertises four new paths: `/v1/exchange-items/{id}/conversations`, `/v1/conversations`, `/v1/conversations/{id}`, `/v1/conversations/{id}/messages` (GET + POST).
   - `/messages` 307 → login when anon; `/messages/<random-uuid>` 307 → login when anon (was 500 mid-development; root cause was a client component pulling `next/headers` via the api client — fixed by introducing server actions for the fetch + send paths).
 - **No new bug-registry entries.** The "client component can't import the auth-aware api client" gotcha is already captured implicitly by Next 15's `next/headers` enforcement; we work around it via server actions, which is the standard pattern.
+
+### 2026-05-16 08:00 UTC — Lighthouse audit pass (100/100/100/100)
+
+Production `https://esharevice.com/` mobile audit went from 86 / 92 / 96 / 100 to **100 / 100 / 100 / 100** across Performance / Accessibility / Best Practices / SEO. Full audit: [docs/features/2026-05-16_lighthouse-audit.md](../docs/features/2026-05-16_lighthouse-audit.md).
+
+- **Commit:** `4ee7dba chore(a11y/perf): Lighthouse audit pass`.
+- **Image:** `ghcr.io/myndgrid/esharevice-web:4ee7dba`. API image unchanged.
+- **Roll:** `docker compose up -d --force-recreate web`. Healthy in 6 s.
+- **Fixes:** 3 color tokens darkened for WCAG AA (`--accent` light + `--fg-subtle` light + dark); header auth buttons bumped to `size="md"` + `gap-3` for the 24×24 exclusive-zone rule; first 3 home cards eager-load with `fetchPriority="high"` (LCP 2.8 s → <1 s); `apps/web/app/icon.svg` added so `/favicon.ico` 200s instead of 404ing in the console.

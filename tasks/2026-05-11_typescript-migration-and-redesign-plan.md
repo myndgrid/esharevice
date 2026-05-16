@@ -1000,6 +1000,10 @@ These are isolated, reversible, low-risk fixes that don't require the new stack:
 
 ## Progress Log
 
+### 2026-05-16 08:00 UTC — Lighthouse audit: 100/100/100/100
+
+Production home page went from 86 / 92 / 96 / 100 to **100 / 100 / 100 / 100** across Performance / Accessibility / Best Practices / SEO (mobile profile). Three contrast tokens darkened, header auth buttons sized to 44 px tap targets + extra gap, first 3 home cards eager-load with `fetchPriority="high"`, and `app/icon.svg` killed the favicon 404. Full audit: [docs/features/2026-05-16_lighthouse-audit.md](../docs/features/2026-05-16_lighthouse-audit.md).
+
 ### 2026-05-16 07:30 UTC — Messages feature shipped (phase A)
 
 The last big-ticket product feature: per-listing conversations between the owner and one prospective party. UNIQUE (item_id, initiator_id) makes thread creation idempotent at the SQL layer; cursor pagination on `(last_message_at desc, id desc)` for the list view and forward `(created_at, id)` for the chat scroll. Web client polls every 5 s with a tail-cursor so idle threads cost an empty page; optimistic-UI send via local tempId with rollback on failure. Server actions wrap `lib/api` for the client component (can't import auth-aware code into the client bundle). Full doc: [docs/features/2026-05-16_messages.md](../docs/features/2026-05-16_messages.md). Phase B (SSE + email-on-new-message) deferred.

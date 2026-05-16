@@ -1,3 +1,45 @@
+import withPWAInit from "@ducanh2912/next-pwa";
+
+/**
+ * PWA wrapper. Generates a service worker at /sw.js that:
+ *   - Precaches the built JS/CSS shell (the immutable /_next/static/* output)
+ *   - Network-first for HTML so navigations always try the server first
+ *   - Skipped entirely in dev (no SW noise during HMR)
+ *
+ * `register: true` injects the registration script into our document so
+ * we don't have to hand-wire a useEffect in a client component.
+ * `skipWaiting: true` activates new SW versions immediately on next load
+ * so a deploy lands on the user's next refresh rather than the one after.
+ */
+const withPWA = withPWAInit({
+  dest: "public",
+  register: true,
+  skipWaiting: true,
+  disable: process.env.NODE_ENV === "development",
+  // Don't try to precache the manifest endpoint itself — it's a tiny
+  // dynamic route and the SW would otherwise log a build warning.
+  buildExcludes: [/middleware-manifest\.json$/],
+  // Our own override goes BEFORE the plugin's defaults. extendDefaultRuntimeCaching
+  // keeps the (sensible) defaults for static assets + page navigations.
+  extendDefaultRuntimeCaching: true,
+  workboxOptions: {
+    runtimeCaching: [
+      // NEVER cache same-origin /api/* requests. The SSE proxy at
+      // /api/messages/:id/events is a long-running stream that wouldn't
+      // complete inside NetworkFirst's 10s timeout — the SW would either
+      // kill the connection or cache an empty body. Auth callbacks +
+      // logout endpoints also have side effects that must always hit
+      // the server. Letting the default /api/ NetworkFirst catch these
+      // is the worst kind of bug: works locally, breaks in production.
+      {
+        urlPattern: ({ url, sameOrigin }) =>
+          sameOrigin && url.pathname.startsWith("/api/"),
+        handler: "NetworkOnly",
+      },
+    ],
+  },
+});
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
@@ -28,4 +70,4 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+export default withPWA(nextConfig);

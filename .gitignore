@@ -34,6 +34,14 @@ build/
 .vite/
 *.tsbuildinfo
 
+# next-pwa generates these on every `next build`. Treat them as build
+# artifacts, not source — they're regenerated deterministically by CI.
+apps/web/public/sw.js
+apps/web/public/sw.js.map
+apps/web/public/workbox-*.js
+apps/web/public/workbox-*.js.map
+apps/web/public/fallback-*.js
+
 # === LOGS & OUTPUT ===
 logs/
 *.log

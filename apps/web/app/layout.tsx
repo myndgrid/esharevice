@@ -21,6 +21,19 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "e-Sharevice",
   description: "A community skill and item exchange.",
+  applicationName: "e-Sharevice",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "e-Sharevice",
+    statusBarStyle: "default",
+  },
+  icons: {
+    // SVG is auto-discovered from app/icon.svg; the apple-touch-icon
+    // PNG lives in public/ and needs an explicit link tag here so iOS
+    // home-screen install picks it up.
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
 };
 
 export const viewport: Viewport = {

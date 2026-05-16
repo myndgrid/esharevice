@@ -25,6 +25,16 @@ export default [
     // the Next preset's `@typescript-eslint/triple-slash-reference` rule
     // flags. Ignore the generated file (it's also gitignored, but ESLint
     // doesn't read .gitignore by default in flat config).
-    ignores: ["next-env.d.ts"],
+    //
+    // next-pwa generates public/sw.js + public/workbox-*.js on every
+    // `next build`. They're minified bundles, not source.
+    ignores: [
+      "next-env.d.ts",
+      "public/sw.js",
+      "public/sw.js.map",
+      "public/workbox-*.js",
+      "public/workbox-*.js.map",
+      "public/fallback-*.js",
+    ],
   },
 ];

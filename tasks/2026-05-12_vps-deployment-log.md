@@ -232,3 +232,21 @@ The web app moves from `https://app.esharevice.com` to the root domain `https://
 - **End-to-end flow:** logged-in user → submit → server action POSTs `/v1/exchange-items` (with client-mounted Idempotency-Key) → POSTs `/v1/exchange-items/{id}/image` (multipart) → sharp pipeline generates 3 webp variants → R2 PUT → row's `img_key` updated → redirect to `/items/{id}` → detail page fetches via cdn.esharevice.com. Image upload failure leaves the row in place and redirects with `?image_error=<reason>` for graceful recovery.
 - **External verification:** `/` 200; `/items/new` 307 → login with `return_to=/items/new`; `/items/<uuid>` 404 on missing.
 - **Captured pattern:** the recent prefetch-of-state-clearing-GET fix carried forward — the "+ New" `<Link>` is a normal idempotent GET (no Set-Cookie) so prefetch is safe; logout still uses a `<form method="post">`; Sign-in still has `prefetch={false}` as defense-in-depth.
+
+### 2026-05-16 03:35 UTC — Image upload fix + reserve action
+
+Two commits, two pre-built linux/amd64 images, one rolling recreate of api + web. End-to-end verified locally (against the same Authentik) before any push to prod.
+
+- **Commits:** `a90a8a2 fix(upload): rebuild File as Blob client-side; use Hono parseBody server-side` + `ea2e830 feat: race-safe reserve action`.
+- **Images:** `ghcr.io/myndgrid/esharevice-api:latest` + `:ea2e830` (digest `sha256:cff64d17ce13bb871162c4ee61d4339646d4e5990fed65de8bdf058d8544c1b8`); `ghcr.io/myndgrid/esharevice-web:latest` + `:ea2e830` (digest `sha256:95feb7ce322cf54167fcc443359824d53aa94addecf1a32ba56c49c6d6209b4b`).
+- **Roll:** `git pull` on the VPS, `docker compose pull api web && up -d --force-recreate api web`. Both healthy in under 12 s.
+- **Live verification:**
+  - `/v1/health` 200
+  - `/items/<random-uuid>` 404
+  - `POST /v1/exchange-items/<id>/image` unauthed → 401 (auth gates first)
+  - `PUT /v1/exchange-items/<id>/reserve` unauthed → 401
+  - User-driven browser test: image upload + reserve action both work end-to-end.
+- **Bug-registry entries** (counter 40 → 42):
+  - `[Build] Next 15 Server-Action File Is a One-Shot Stream` — the File from `formData.get(...)` is backed by a one-shot ReadableStream; can't be re-fetched. Materialise as a Buffer → fresh Blob with 3-arg `append`.
+  - `[Build] @hono/zod-openapi Pre-Reads Multipart Bodies When You Declare request.body` — declaring `request.body` makes Hono validate (and consume) the multipart stream BEFORE the handler runs. Omit `body` from the route schema for upload endpoints; use `c.req.parseBody()` in the handler.
+- **Race-safety improvement:** `PUT /reserve` UPDATE now gated on `WHERE reserved = false` — two simultaneous reserve requests can no longer both win. The lost-race branch returns 409 with a useful message instead of silent corruption.

@@ -932,6 +932,24 @@ Categories: `[Logic]` `[Null]` `[Memory]` `[Concurrency]` `[Type]` `[Network]` `
 
 ---
 
+### [Build] Next 15 Server-Action `File` Is a One-Shot Stream
+**Description:** Inside a Next 15 server action, `formData.get("name")` for a file input returns a `File` instance backed by a one-shot `ReadableStream`. If you re-append that `File` to a fresh `FormData` and hand it to `fetch()` to forward to another service, undici emits a malformed multipart body — the receiving server then 400s with something like `Body is unusable: Body has already been read` or `Body has already been read`. The browser sees only the downstream error and you spend an hour blaming the recipient.
+**Avoid:** Materialise the bytes before re-sending. Read once into an `ArrayBuffer`, wrap as a fresh `Blob`, and use the 3-arg `formData.append(name, blob, filename)` form so the multipart part has a `filename=` attribute. Pattern:
+```ts
+const bytes = await file.arrayBuffer();
+const blob = new Blob([bytes], { type: file.type || "application/octet-stream" });
+fd.append("image", blob, file.name);
+```
+Don't trust the original `File` to round-trip through a server-action FormData → fetch → upstream pipeline.
+
+---
+
+### [Build] @hono/zod-openapi Pre-Reads Multipart Bodies When You Declare `request.body`
+**Description:** Defining `request: { body: { content: { "multipart/form-data": { schema: … } } } }` on a `createRoute()` makes Hono run its built-in validator on the body BEFORE the handler runs — and that validator consumes the multipart stream. The handler's `c.req.raw.formData()` then throws `Body is unusable: Body has already been read`. There's no warning, no clear failure mode — just a 400 with no obvious cause. Worse, the schema can be `z.unknown()` and it still consumes the stream just to check existence.
+**Avoid:** For multipart upload routes, OMIT the `body` from the route schema and document the contract via the route's `description` field instead. In the handler, prefer `c.req.parseBody()` (Hono's purpose-built multipart helper) over `c.req.raw.formData()` — same end result but it caches the parsed parts on the context so middleware ordering is no longer fragile. Generalize: any framework that auto-validates request bodies will consume them. If you need raw stream access in the handler, skip the framework-level body schema.
+
+---
+
 ### [Type] Cloudflare Global API Key — Legacy 37-Hex Format Has Been Replaced by `cfk_*`
 **Description:** Cloudflare's Global API Key used to be a 37-character hex string. As of late 2025 they've migrated to a `cfk_<50 chars>` prefixed format without widely updating docs. Authentication still uses `X-Auth-Email` + `X-Auth-Key` headers (NOT Bearer), but auth fails with "Unknown X-Auth-Key or X-Auth-Email" if you use the wrong email — and the legacy 37-hex format check is gone, so even the right key with the wrong email gives an unhelpful "Unknown" message.
 **Avoid:** When debugging Cloudflare API auth: (a) confirm the account-login email (not necessarily a developer-comms email), (b) use scoped API Tokens instead of the Global Key whenever possible — they use `Authorization: Bearer ...` and are clearly diagnosable as valid vs invalid via `GET /user/tokens/verify`, (c) the Global Key remains valuable mostly when scoped tokens can't reach an endpoint, but Cloudflare is actively deprecating it (cf. Origin CA Key deprecation banner in the dashboard).
@@ -1234,4 +1252,4 @@ node -e "const wtf = require('wtfnode'); setTimeout(wtf.dump, 5000);"
 
 ---
 
-*Last updated: 2026-05-16 01:52 UTC | Global SWE Agent Config | Adapt the Architecture and Project Structure sections per project — everything else applies universally. Bug registry: 40 entries (+1 from the 2026-05-16 root-domain cutover: Docker single-file bind mounts pin to inode and silently break on `git pull`).*
+*Last updated: 2026-05-16 03:35 UTC | Global SWE Agent Config | Adapt the Architecture and Project Structure sections per project — everything else applies universally. Bug registry: 42 entries (+2 from the 2026-05-16 image-upload incident: server-action File is a one-shot stream, and `@hono/zod-openapi` `request.body` pre-reads multipart streams).*

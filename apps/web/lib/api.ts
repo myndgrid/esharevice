@@ -1,4 +1,4 @@
-import { cursorPage, ExchangeItem, UserPublic } from "@esharevice/shared";
+import { cursorPage, ExchangeItem, ExchangeItemCreate, UserPublic } from "@esharevice/shared";
 import { z } from "zod";
 import { auth } from "./auth";
 
@@ -30,6 +30,8 @@ export class ApiError extends Error {
 type Options = {
   method?: "GET" | "POST" | "PUT" | "DELETE";
   body?: unknown;
+  /** Pre-built FormData body — bypasses JSON serialisation; sets no content-type so the browser/runtime picks the multipart boundary. */
+  formBody?: FormData;
   /**
    * If true (default), attach the current session's access token. Set to false
    * for public endpoints to avoid burning a refresh round-trip on every render.
@@ -37,6 +39,8 @@ type Options = {
   authed?: boolean;
   /** Server components revalidate every N seconds; pass 0 for no-store. */
   revalidate?: number | false;
+  /** Optional Idempotency-Key — forwarded to unsafe routes. */
+  idempotencyKey?: string;
 };
 
 async function call<T>(path: string, schema: z.ZodType<T>, opts: Options = {}): Promise<T> {
@@ -45,6 +49,9 @@ async function call<T>(path: string, schema: z.ZodType<T>, opts: Options = {}): 
 
   if (opts.body !== undefined) {
     headers["content-type"] = "application/json";
+  }
+  if (opts.idempotencyKey) {
+    headers["idempotency-key"] = opts.idempotencyKey;
   }
 
   if (opts.authed !== false) {
@@ -65,8 +72,12 @@ async function call<T>(path: string, schema: z.ZodType<T>, opts: Options = {}): 
     method: opts.method ?? "GET",
     headers,
     signal: controller.signal,
-    ...(opts.body !== undefined ? { body: JSON.stringify(opts.body) } : {}),
   };
+  if (opts.formBody) {
+    init.body = opts.formBody;
+  } else if (opts.body !== undefined) {
+    init.body = JSON.stringify(opts.body);
+  }
   if (opts.revalidate === false || opts.revalidate === 0) {
     init.cache = "no-store";
   } else if (typeof opts.revalidate === "number") {
@@ -115,10 +126,23 @@ export const api = {
   getExchangeItem: (id: string) =>
     call(`/v1/exchange-items/${id}`, ExchangeItem, { authed: false, revalidate: 60 }),
 
-  reserveExchangeItem: (id: string) =>
-    call(`/v1/exchange-items/${id}/reserve`, ExchangeItem, {
-      method: "PUT",
-      authed: true,
-      revalidate: false,
-    }),
+  reserveExchangeItem: (id: string, idempotencyKey?: string) => {
+    const opts: Options = { method: "PUT", authed: true, revalidate: false };
+    if (idempotencyKey) opts.idempotencyKey = idempotencyKey;
+    return call(`/v1/exchange-items/${id}/reserve`, ExchangeItem, opts);
+  },
+
+  createExchangeItem: (body: z.infer<typeof ExchangeItemCreate>, idempotencyKey?: string) => {
+    const opts: Options = { method: "POST", body, authed: true, revalidate: false };
+    if (idempotencyKey) opts.idempotencyKey = idempotencyKey;
+    return call("/v1/exchange-items", ExchangeItem, opts);
+  },
+
+  uploadExchangeItemImage: (id: string, file: File, idempotencyKey?: string) => {
+    const fd = new FormData();
+    fd.append("image", file);
+    const opts: Options = { method: "POST", formBody: fd, authed: true, revalidate: false };
+    if (idempotencyKey) opts.idempotencyKey = idempotencyKey;
+    return call(`/v1/exchange-items/${id}/image`, ExchangeItem, opts);
+  },
 };

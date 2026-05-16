@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Card, CardContent } from "@esharevice/ui";
 import type { ExchangeItem } from "@esharevice/shared";
 import { api, ApiError } from "../lib/api";
@@ -52,22 +53,36 @@ export default async function HomePage(): Promise<React.ReactElement> {
 
 function ExchangeItemCard({ item }: { item: ExchangeItem }): React.ReactElement {
   return (
-    <Card>
-      <CardContent>
-        <div className="mb-2 flex items-baseline justify-between gap-2">
-          <h2 className="text-lg font-semibold tracking-tight">{item.provider}</h2>
-          {item.reserved && (
-            <span className="rounded-full bg-bg-subtle px-2 py-0.5 text-xs text-fg-muted">
-              reserved
-            </span>
+    <Link
+      href={`/items/${item.id}`}
+      className="block rounded-lg outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+    >
+      <Card>
+        <CardContent>
+          {item.img_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={item.img_url}
+              alt={item.service}
+              loading="lazy"
+              className="mb-3 aspect-[4/3] w-full rounded-md object-cover"
+            />
           )}
-        </div>
-        <p className="mb-1 text-sm font-medium text-fg">{item.service}</p>
-        <p className="mb-3 line-clamp-3 text-sm text-fg-muted">{item.description}</p>
-        <p className="text-xs text-fg-subtle">
-          Exchange: <span className="text-fg-muted">{item.exchange}</span>
-        </p>
-      </CardContent>
-    </Card>
+          <div className="mb-2 flex items-baseline justify-between gap-2">
+            <h2 className="text-lg font-semibold tracking-tight">{item.provider}</h2>
+            {item.reserved && (
+              <span className="rounded-full bg-bg-subtle px-2 py-0.5 text-xs text-fg-muted">
+                reserved
+              </span>
+            )}
+          </div>
+          <p className="mb-1 text-sm font-medium text-fg">{item.service}</p>
+          <p className="mb-3 line-clamp-3 text-sm text-fg-muted">{item.description}</p>
+          <p className="text-xs text-fg-subtle">
+            Exchange: <span className="text-fg-muted">{item.exchange}</span>
+          </p>
+        </CardContent>
+      </Card>
+    </Link>
   );
 }

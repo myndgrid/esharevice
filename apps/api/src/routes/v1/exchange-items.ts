@@ -2,7 +2,13 @@ import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { getDb, exchangeItems, type ExchangeItemRow } from "@esharevice/db";
-import { CursorQuery, ExchangeItem, ExchangeItemCreate, cursorPage } from "@esharevice/shared";
+import {
+  CursorQuery,
+  ExchangeItem,
+  ExchangeItemCreate,
+  ExchangeItemUpdate,
+  cursorPage,
+} from "@esharevice/shared";
 import { attachAuth, requireAuth } from "../../middleware/auth.js";
 import { idempotency } from "../../middleware/idempotency.js";
 import { decodeCursor, encodeCursor } from "../../lib/cursor.js";
@@ -25,6 +31,7 @@ const ProblemSchema = z
 
 const ItemSchema = ExchangeItem.openapi("ExchangeItem");
 const ItemCreateSchema = ExchangeItemCreate.openapi("ExchangeItemCreate");
+const ItemUpdateSchema = ExchangeItemUpdate.openapi("ExchangeItemUpdate");
 const ListQuerySchema = CursorQuery.extend({
   q: z
     .string()
@@ -164,6 +171,73 @@ route.openapi(
     const row = inserted[0];
     if (!row) throw new HTTPException(500, { message: "insert returned no rows" });
     return c.json(toApiItem(row), 201);
+  },
+);
+
+// ─────────────────────── PUT /v1/exchange-items/:id
+//
+// Edit an existing exchange item. Owner-only. Body is the partial
+// ExchangeItemUpdate schema — every field optional. Only the keys
+// actually present in the request are written. Returns 200 with the
+// full updated row.
+route.openapi(
+  createRoute({
+    method: "put",
+    path: "/exchange-items/{id}",
+    tags: ["exchange-items"],
+    summary: "Edit an exchange item the authenticated user owns.",
+    security: [{ Bearer: [] }],
+    middleware: [requireAuth, idempotency()] as const,
+    request: {
+      params: IdParamSchema,
+      body: { content: { "application/json": { schema: ItemUpdateSchema } } },
+    },
+    responses: {
+      200: { description: "Updated", content: { "application/json": { schema: ItemSchema } } },
+      400: { description: "Validation failed", content: problemContent },
+      401: { description: "Unauthenticated", content: problemContent },
+      403: { description: "Not the item owner", content: problemContent },
+      404: { description: "Item not found", content: problemContent },
+    },
+  }),
+  async (c) => {
+    const u = c.get("user");
+    if (!u) throw new HTTPException(401, { message: "no user attached" });
+    const { id } = c.req.valid("param");
+    const body = c.req.valid("json");
+
+    const db = getDb();
+    const existing = await db
+      .select()
+      .from(exchangeItems)
+      .where(eq(exchangeItems.id, id))
+      .limit(1);
+    const row = existing[0];
+    if (!row) throw new HTTPException(404, { message: "Not Found" });
+    if (row.user_id !== u.id) {
+      throw new HTTPException(403, { message: "Only the item owner can edit this listing" });
+    }
+
+    // Build a sparse update — only write keys that are actually present.
+    // Drizzle ignores keys with undefined values in its `set` builder, but
+    // being explicit keeps the SQL minimal and avoids accidentally clearing
+    // fields a client didn't intend to touch.
+    const patch: Partial<typeof exchangeItems.$inferInsert> = { updated_at: new Date() };
+    if (body.provider !== undefined) patch.provider = body.provider;
+    if (body.service !== undefined) patch.service = body.service;
+    if (body.date !== undefined) patch.date = body.date;
+    if (body.exchange !== undefined) patch.exchange = body.exchange;
+    if (body.description !== undefined) patch.description = body.description;
+    if (body.rate_type !== undefined) patch.rate_type = body.rate_type;
+
+    const updated = await db
+      .update(exchangeItems)
+      .set(patch)
+      .where(eq(exchangeItems.id, id))
+      .returning();
+    const u2 = updated[0];
+    if (!u2) throw new HTTPException(500, { message: "update returned no rows" });
+    return c.json(toApiItem(u2), 200);
   },
 );
 

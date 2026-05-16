@@ -78,18 +78,36 @@ e-sharevice/
 nvm use                                              # picks Node 20.10 from .nvmrc
 corepack enable                                      # pins pnpm via package.json#packageManager
 pnpm install
-cp .env.example .env                                 # fill in real values
 
-# Start local datastores (Postgres + Redis on host ports 5432 / 6379)
+# Start local datastores (Postgres on host port 5433, Redis on 6380 — see
+# "Why those ports" below). Schema auto-loads via the citext + pgcrypto
+# extensions init script on first volume creation.
 docker compose -f infra/docker-compose.dev.yml up -d
 
-# First-time: generate Drizzle migrations from the schema, then apply
-pnpm --filter @esharevice/db db:generate
-pnpm --filter @esharevice/db db:migrate
+# Apply the Drizzle migration to the fresh local DB
+docker exec -i esharevice-dev-postgres-1 psql -U esharevice -d esharevice \
+  < packages/db/drizzle/0000_0001_initial.sql
 
 # Run web + api in parallel (Turborepo)
 pnpm dev
 ```
+
+### Local environment files — two on purpose
+
+Local dev needs two env files, one per running process. They are gitignored.
+
+| File | Loaded by | Holds | Why separate |
+|---|---|---|---|
+| `apps/api/.env` | `tsx watch --env-file=.env` (the API `dev` script) | `DATABASE_URL`, `REDIS_URL`, `OIDC_ISSUER`/`AUDIENCE`/`JWKS_URL`, `R2_*`, `CDN_BASE_URL`, `WEB_ORIGIN` | The API verifies JWTs against the JWKS — it never sees or needs `OIDC_CLIENT_SECRET`. |
+| `apps/web/.env.local` | Next.js (auto, framework convention) | `NEXT_PUBLIC_API_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_REDIRECT_URI`, `SESSION_COOKIE_SECRET` | The web app is the OIDC *client* — it owns the client secret and the cookie-signing key. The API has zero use for either. |
+
+The split mirrors production exactly: in [infra/docker-compose.yml](infra/docker-compose.yml) each container gets its own `environment:` block. The API container never sees `OIDC_CLIENT_SECRET`; the web container never sees `DATABASE_URL`. **That separation is a real security boundary — keep it.** A single root `.env` is tempting but would expose every secret to both processes, and "works locally, broken in prod" becomes more likely.
+
+The two files overlap only on `OIDC_ISSUER` (the public Authentik authority URL — not a secret). Everything else is non-overlapping.
+
+### Why dev ports 5433 / 6380 instead of 5432 / 6379
+
+[infra/docker-compose.dev.yml](infra/docker-compose.dev.yml) binds Postgres on host port `5433` and Redis on `6380` so the dev stack coexists with other local datastores on the same machine without colliding. Container ports inside the dev compose network stay at 5432/6379 — only the host-side bind is shifted.
 
 ### Local dev URLs
 

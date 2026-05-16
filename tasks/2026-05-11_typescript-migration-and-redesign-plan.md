@@ -1000,6 +1000,12 @@ These are isolated, reversible, low-risk fixes that don't require the new stack:
 
 ## Progress Log
 
+### 2026-05-16 04:35 UTC — Observability + social OAuth scaffolding
+
+Sentry SDK init lands on both api (`@sentry/node`) and web (`@sentry/nextjs`). API instruments BEFORE any other import so HTTP/Postgres patches install correctly; onError reports 5xx + unexpected errors via `captureException` (4xx skipped to avoid flooding). Web uses Next 15's `register()` hook with `NEXT_RUNTIME`-aware init. Both env-gated on `SENTRY_DSN` so local + CI no-op. Verified live: both 95-char DSNs reach the production containers.
+
+Social OAuth scaffolding (Google + GitHub) shipped as a blueprint template — no functional change until the user creates the upstream OAuth apps. Compose threads the four env vars into both Authentik containers with empty defaults; the worker (which applies blueprints) gets them too. The activation procedure (~20 min of dashboard clicks) is documented in [docs/features/2026-05-16_social-oauth.md](../docs/features/2026-05-16_social-oauth.md).
+
 ### 2026-05-16 04:10 UTC — Saved items + reserve-race vitest
 
 Saved-items feature shipped end-to-end: new `exchange_item_saves` table (composite PK, both FKs cascade), four new `/v1` endpoints (GET save-state / PUT save / DELETE unsave / GET saves listing), idempotency middleware on the writes, optimistic-UI bookmark button on the detail page, populated `/saved` listing on the web. Plus a vitest integration test that proves the reserve-race invariant — two concurrent UPDATEs against the same row, exactly one wins — which skips gracefully in CI without a live DB. Full doc: [docs/features/2026-05-16_saved-items.md](../docs/features/2026-05-16_saved-items.md).

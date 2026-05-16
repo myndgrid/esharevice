@@ -281,3 +281,20 @@ Two-thread deploy: integration test that locks in the reserve race-safety invari
   - `apps/api/tests/reserve-race.test.ts` — runs two concurrent UPDATEs at the same row, asserts exactly one returns a row (the other's WHERE clause re-evaluates `reserved=true` after the first commits → zero rows → 409 from the handler). Skips gracefully when `DATABASE_URL` is the unit-test placeholder so CI without datastores stays green.
   - Total vitest cases: 11 (10 unit + 1 integration).
 - **No new bug-registry entries.** Slice was clean across both API + web.
+
+### 2026-05-16 04:35 UTC — Sentry SDKs wired + social OAuth scaffolding
+
+Two-thread deploy. Observability lights up + the scaffolding to enable Google/GitHub social sign-in is in place.
+
+**Sentry (`3fa71b3 feat(observability): wire @sentry/node + @sentry/nextjs SDKs`)**
+- `apps/api/src/instrument.ts` — env-gated `Sentry.init`, imported FIRST in `index.ts` so runtime instrumentation patches HTTP/Postgres before downstream modules load. 10% trace sample rate; tracesSampler drops /health spans.
+- `apps/api/src/middleware/error.ts` — `onError` reports 5xx + unexpected errors to Sentry via `captureException`. 4xx are user-facing and skipped.
+- `apps/web/instrumentation.ts` + `apps/web/instrumentation-client.ts` — Next 15's `register()` hook + client-side init. Both env-gated.
+- Verified live: VPS `SENTRY_DSN_API`/`SENTRY_DSN_WEB` are both 95-char DSNs; the api container actually receives `SENTRY_DSN` (length 95). Sentry SDK initialized.
+- **Images:** `ghcr.io/myndgrid/esharevice-api:3fa71b3` (digest `sha256:4feeb22053649fd527ad233aef3f2df01082b4796da05eeb7c05bd509ff484fc`); `ghcr.io/myndgrid/esharevice-web:3fa71b3` (digest `sha256:c4590fdaac4f3c3728b938f6d1b7dcf439e82a55c789dfbf9aace91efcb9bc64`).
+
+**Social OAuth scaffolding (`9af2710 feat(authentik): scaffolding for Google + GitHub social OAuth sources`)**
+- Blueprint template `infra/authentik/blueprints/social.yaml.template` — Source entries for Google + GitHub tied to default authentication/enrollment flows. `consumer_key/secret` resolve via Authentik's `!Env` tag.
+- `infra/docker-compose.yml` — `GOOGLE_OAUTH_*` + `GITHUB_OAUTH_*` env threaded into BOTH `authentik-server` + `authentik-worker` (worker applies blueprints) with empty defaults so an unset env doesn't break anything.
+- Authentik containers recreated with new env. Server healthy in 8 s. Worker health-check still in `starting` window 8 s in (its first-boot warmup is 60 s). Smoke: `https://auth.esharevice.com/application/o/e-sharevice-web/.well-known/openid-configuration` returns 200; `/` and `/v1/health` both 200.
+- **No functional change yet** — activation requires the user to (1) create OAuth apps in GCP + GitHub, (2) paste secrets into `infra/.env`, (3) rename the template to `social.yaml`, (4) recreate authentik. Full procedure: [docs/features/2026-05-16_social-oauth.md](../docs/features/2026-05-16_social-oauth.md).

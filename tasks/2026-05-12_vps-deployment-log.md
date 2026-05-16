@@ -298,3 +298,16 @@ Two-thread deploy. Observability lights up + the scaffolding to enable Google/Gi
 - `infra/docker-compose.yml` — `GOOGLE_OAUTH_*` + `GITHUB_OAUTH_*` env threaded into BOTH `authentik-server` + `authentik-worker` (worker applies blueprints) with empty defaults so an unset env doesn't break anything.
 - Authentik containers recreated with new env. Server healthy in 8 s. Worker health-check still in `starting` window 8 s in (its first-boot warmup is 60 s). Smoke: `https://auth.esharevice.com/application/o/e-sharevice-web/.well-known/openid-configuration` returns 200; `/` and `/v1/health` both 200.
 - **No functional change yet** — activation requires the user to (1) create OAuth apps in GCP + GitHub, (2) paste secrets into `infra/.env`, (3) rename the template to `social.yaml`, (4) recreate authentik. Full procedure: [docs/features/2026-05-16_social-oauth.md](../docs/features/2026-05-16_social-oauth.md).
+
+### 2026-05-16 04:50 UTC — Google OAuth source activated (GitHub deferred)
+
+User opted for Google only on initial activation. Live blueprint `infra/authentik/blueprints/social.yaml` shipped with one Google source; the dual-provider template stays around as `social.yaml.template` for future addition.
+
+- **Commit:** `c2e4679 feat(authentik): Google OAuth source live (GitHub deferred)`.
+- **Secrets pushed to VPS** via `scp` → staged file on `/tmp/`, python merges into `infra/.env`, staged file deleted. Local id length 73, secret length 35 — both confirmed populated on VPS post-write.
+- **Recreated authentik-server + authentik-worker**. Both healthy in 12 s. Worker applied `custom/social.yaml`.
+- **Verified via admin API** (per the bug-registry rule that blueprint apply log isn't trustworthy):
+  - `GET /api/v3/sources/oauth/` → `slug=google, name=Google, enabled=True, provider=google`.
+  - `GET /api/v3/managed/blueprints/` → `e-Sharevice social OAuth sources | status: successful | path: custom/social.yaml | last_applied: 2026-05-16T04:50:08Z`.
+  - `GET /source/oauth/login/google/` → 302 → `accounts.google.com/o/oauth2/auth?client_id=1006...&redirect_uri=https://auth.esharevice.com/source/oauth/callback/google/&...` (end-to-end Google flow reachable).
+- **Browser smoke pending the user.** Login screen renders the "Sign in with Google" button via the Authentik SPA — only visible to a real browser, not curl. Visit `https://auth.esharevice.com` in incognito to confirm.

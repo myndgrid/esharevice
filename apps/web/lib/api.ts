@@ -1,8 +1,11 @@
 import {
+  Conversation,
   cursorPage,
   ExchangeItem,
   ExchangeItemCreate,
   ExchangeItemUpdate,
+  Message,
+  MessageCreate,
   SaveState,
   UserPublic,
 } from "@esharevice/shared";
@@ -203,5 +206,45 @@ export const api = {
     if (opts.limit) params.set("limit", String(opts.limit));
     const qs = params.toString() ? `?${params.toString()}` : "";
     return call(`/v1/saves${qs}`, cursorPage(ExchangeItem), { authed: true, revalidate: false });
+  },
+
+  // ─────────────────────── Messaging
+  startConversation: (itemId: string, idempotencyKey?: string) => {
+    const opts: Options = { method: "POST", authed: true, revalidate: false };
+    if (idempotencyKey) opts.idempotencyKey = idempotencyKey;
+    return call(`/v1/exchange-items/${itemId}/conversations`, Conversation, opts);
+  },
+
+  listConversations: (opts: { cursor?: string; limit?: number } = {}) => {
+    const params = new URLSearchParams();
+    if (opts.cursor) params.set("cursor", opts.cursor);
+    if (opts.limit) params.set("limit", String(opts.limit));
+    const qs = params.toString() ? `?${params.toString()}` : "";
+    return call(`/v1/conversations${qs}`, cursorPage(Conversation), { authed: true, revalidate: false });
+  },
+
+  getConversation: (id: string) =>
+    call(`/v1/conversations/${id}`, Conversation, { authed: true, revalidate: false }),
+
+  listMessages: (conversationId: string, opts: { cursor?: string; limit?: number } = {}) => {
+    const params = new URLSearchParams();
+    if (opts.cursor) params.set("cursor", opts.cursor);
+    if (opts.limit) params.set("limit", String(opts.limit));
+    const qs = params.toString() ? `?${params.toString()}` : "";
+    return call(
+      `/v1/conversations/${conversationId}/messages${qs}`,
+      cursorPage(Message),
+      { authed: true, revalidate: false },
+    );
+  },
+
+  sendMessage: (
+    conversationId: string,
+    body: z.infer<typeof MessageCreate>,
+    idempotencyKey?: string,
+  ) => {
+    const opts: Options = { method: "POST", body, authed: true, revalidate: false };
+    if (idempotencyKey) opts.idempotencyKey = idempotencyKey;
+    return call(`/v1/conversations/${conversationId}/messages`, Message, opts);
   },
 };

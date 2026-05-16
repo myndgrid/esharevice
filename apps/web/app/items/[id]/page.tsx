@@ -5,6 +5,7 @@ import { api, ApiError } from "../../../lib/api";
 import { auth } from "../../../lib/auth";
 import { ReserveButton } from "./reserve-button";
 import { SaveButton } from "./save-button";
+import { startConversationAction } from "./message-owner-action";
 
 export const dynamic = "force-dynamic";
 
@@ -106,6 +107,11 @@ export default async function ItemDetailPage({ params, searchParams }: Props): P
               <span className="text-xs text-fg-muted">
                 {me && item.reserved_by === me.id ? "You reserved this." : "Already reserved."}
               </span>
+            )}
+            {session && !isOwner && (
+              <form action={startConversationAction.bind(null, item.id)} className="contents">
+                <Button type="submit" variant="ghost" size="sm">Message owner</Button>
+              </form>
             )}
             {session && <SaveButton itemId={item.id} initialSaved={initialSaved} />}
           </div>

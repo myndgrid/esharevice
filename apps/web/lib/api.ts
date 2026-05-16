@@ -247,4 +247,18 @@ export const api = {
     if (idempotencyKey) opts.idempotencyKey = idempotencyKey;
     return call(`/v1/conversations/${conversationId}/messages`, Message, opts);
   },
+
+  // Mark-read is fire-and-forget on the client side — the response body
+  // is empty (204) and the call's only purpose is bumping the
+  // suppression window. The shared `call` helper expects a Zod schema
+  // for response parsing, so this uses fetch directly.
+  markConversationRead: async (conversationId: string): Promise<void> => {
+    const session = await auth();
+    if (!session?.access_token) return;
+    await fetch(`${API_BASE}/v1/conversations/${conversationId}/read`, {
+      method: "PATCH",
+      headers: { authorization: `Bearer ${session.access_token}` },
+      cache: "no-store",
+    });
+  },
 };

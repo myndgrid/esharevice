@@ -3,7 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@esharevice/ui";
 import { Message } from "@esharevice/shared";
-import { fetchMessagesAfterAction, sendMessageAction } from "./actions";
+import {
+  fetchMessagesAfterAction,
+  markConversationReadAction,
+  sendMessageAction,
+} from "./actions";
 
 /**
  * Polling kicks in only when SSE is unavailable (network, intermediary,
@@ -79,11 +83,23 @@ export function ConversationView({
         // Server confirmed the stream is open. Catch up on anything that
         // arrived between page-render and SSE-open (rare race).
         void catchUp();
+        // Mark read — viewer is now actively engaged on this thread.
+        // Suppression window on the API side prevents email-on-new-message
+        // for the recipient who's looking at the thread right now.
+        void markConversationReadAction(conversationId);
       });
       sse.addEventListener("message", (e) => {
         try {
           const parsed = Message.parse(JSON.parse((e as MessageEvent<string>).data));
           setMessages((prev) => mergeNew(prev, [parsed]));
+          // Keep the read timestamp warm — every incoming message reset
+          // the recipient's "actively viewing" window. Sender's own
+          // message doesn't need this (the API marks the sender as read
+          // on insert), but the cheapest correct thing is to fire
+          // unconditionally; the suppression check is server-side.
+          if (parsed.sender_id !== meId) {
+            void markConversationReadAction(conversationId);
+          }
         } catch {
           /* malformed event — ignore */
         }

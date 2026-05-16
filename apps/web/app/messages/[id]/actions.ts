@@ -29,3 +29,7 @@ export async function sendMessageAction(
 ): Promise<Message> {
   return api.sendMessage(conversationId, { body }, idempotencyKey);
 }
+
+export async function markConversationReadAction(conversationId: string): Promise<void> {
+  await api.markConversationRead(conversationId);
+}

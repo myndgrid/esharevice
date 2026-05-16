@@ -17,9 +17,11 @@ import {
   MessageCreate,
   cursorPage,
 } from "@esharevice/shared";
+import { streamSSE } from "hono/streaming";
 import { requireAuth } from "../../middleware/auth.js";
 import { idempotency } from "../../middleware/idempotency.js";
 import { decodeCursor, encodeCursor } from "../../lib/cursor.js";
+import { publishMessage, subscribeToConversation } from "../../lib/message-bus.js";
 import type { AppEnv } from "../../app.js";
 
 const route = new OpenAPIHono<AppEnv>();
@@ -466,7 +468,98 @@ route.openapi(
       .set({ last_message_at: now })
       .where(eq(conversations.id, id));
 
-    return c.json(toApiMessage(msg), 201);
+    const apiMsg = toApiMessage(msg);
+    // Fan out to any open SSE subscribers on this conversation BEFORE
+    // returning to the sender — that way both participants see the
+    // message at the same wall-clock moment instead of the sender's
+    // optimistic UI racing ahead by an event-loop tick.
+    publishMessage(id, apiMsg);
+    return c.json(apiMsg, 201);
+  },
+);
+
+// ─────────────────────── GET /v1/conversations/{id}/events
+//
+// SSE stream of new messages. The client subscribes after rendering the
+// initial message list; every new message arrives within ~one event-loop
+// tick of the sender's POST returning. Heartbeat every 25s keeps the
+// connection alive past Caddy's idle timeout (bug-registry entry).
+//
+// Auth: same participant check as the other conversation routes.
+//
+// Reconnect: the EventSource client handles it natively. We don't
+// re-deliver messages on reconnect — the client should issue a regular
+// `GET /messages?cursor=…` after `onopen` to catch up on anything that
+// arrived during the disconnect window.
+route.openapi(
+  createRoute({
+    method: "get",
+    path: "/conversations/{id}/events",
+    tags: ["messages"],
+    summary: "SSE stream of new messages in a conversation.",
+    security: [{ Bearer: [] }],
+    middleware: [requireAuth] as const,
+    request: { params: IdParamSchema },
+    responses: {
+      200: { description: "event-stream", content: { "text/event-stream": { schema: z.string() } } },
+      401: { description: "Unauthenticated", content: problemContent },
+      403: { description: "Not a participant", content: problemContent },
+      404: { description: "Conversation not found", content: problemContent },
+    },
+  }),
+  async (c) => {
+    const u = c.get("user");
+    if (!u) throw new HTTPException(401, { message: "no user attached" });
+    const { id } = c.req.valid("param");
+    const db = getDb();
+
+    const convRows = await db
+      .select({ initiator_id: conversations.initiator_id, owner_id: exchangeItems.user_id })
+      .from(conversations)
+      .innerJoin(exchangeItems, eq(conversations.item_id, exchangeItems.id))
+      .where(eq(conversations.id, id))
+      .limit(1);
+    const conv = convRows[0];
+    if (!conv) throw new HTTPException(404, { message: "Not Found" });
+    if (conv.initiator_id !== u.id && conv.owner_id !== u.id) {
+      throw new HTTPException(403, { message: "Not a participant in this conversation" });
+    }
+
+    return streamSSE(c, async (stream) => {
+      // Initial comment frame — flushes headers + lets the client know
+      // the stream is open even if no messages arrive immediately.
+      await stream.writeSSE({ data: "ok", event: "ready" });
+
+      // Subscribe to publishes. The closure captures `stream`, so each
+      // open connection gets its own callback.
+      const unsubscribe = subscribeToConversation(id, (m) => {
+        // Hono's streamSSE accepts plain awaitable writes — we ignore
+        // the returned promise from the callback (Node's EventEmitter
+        // is sync) and rely on undici's TCP backpressure handling.
+        void stream.writeSSE({ event: "message", data: JSON.stringify(m), id: m.id });
+      });
+
+      // Heartbeat every 25 s. Caddy 2's default reverse-proxy idle
+      // timeout is 60 s; any quieter cadence than ~30 s risks the proxy
+      // killing the connection on idle threads. Captured in the bug
+      // registry under [Network] Long-Running Connection Dropped by Proxy.
+      const heartbeat = setInterval(() => {
+        void stream.writeSSE({ event: "heartbeat", data: String(Date.now()) });
+      }, 25_000);
+
+      // Wait for the client to disconnect. Hono's `aborted` promise
+      // resolves when the upstream closes; cleanup happens on the
+      // common exit path so neither EventEmitter listeners nor the
+      // heartbeat interval can leak.
+      try {
+        await new Promise<void>((resolve) => {
+          stream.onAbort(() => resolve());
+        });
+      } finally {
+        clearInterval(heartbeat);
+        unsubscribe();
+      }
+    });
   },
 );
 

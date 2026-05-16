@@ -1,4 +1,10 @@
-import { cursorPage, ExchangeItem, ExchangeItemCreate, UserPublic } from "@esharevice/shared";
+import {
+  cursorPage,
+  ExchangeItem,
+  ExchangeItemCreate,
+  SaveState,
+  UserPublic,
+} from "@esharevice/shared";
 import { z } from "zod";
 import { auth } from "./auth";
 
@@ -152,5 +158,29 @@ export const api = {
     const opts: Options = { method: "POST", formBody: fd, authed: true, revalidate: false };
     if (idempotencyKey) opts.idempotencyKey = idempotencyKey;
     return call(`/v1/exchange-items/${id}/image`, ExchangeItem, opts);
+  },
+
+  // ─────────────────────── Saves
+  isItemSaved: (id: string) =>
+    call(`/v1/exchange-items/${id}/save`, SaveState, { authed: true, revalidate: false }),
+
+  saveItem: (id: string, idempotencyKey?: string) => {
+    const opts: Options = { method: "PUT", authed: true, revalidate: false };
+    if (idempotencyKey) opts.idempotencyKey = idempotencyKey;
+    return call(`/v1/exchange-items/${id}/save`, SaveState, opts);
+  },
+
+  unsaveItem: (id: string, idempotencyKey?: string) => {
+    const opts: Options = { method: "DELETE", authed: true, revalidate: false };
+    if (idempotencyKey) opts.idempotencyKey = idempotencyKey;
+    return call(`/v1/exchange-items/${id}/save`, SaveState, opts);
+  },
+
+  listSavedItems: (opts: { cursor?: string; limit?: number } = {}) => {
+    const params = new URLSearchParams();
+    if (opts.cursor) params.set("cursor", opts.cursor);
+    if (opts.limit) params.set("limit", String(opts.limit));
+    const qs = params.toString() ? `?${params.toString()}` : "";
+    return call(`/v1/saves${qs}`, cursorPage(ExchangeItem), { authed: true, revalidate: false });
   },
 };

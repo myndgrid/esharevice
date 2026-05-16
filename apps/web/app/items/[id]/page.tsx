@@ -4,6 +4,7 @@ import { Button, Card, CardContent } from "@esharevice/ui";
 import { api, ApiError } from "../../../lib/api";
 import { auth } from "../../../lib/auth";
 import { ReserveButton } from "./reserve-button";
+import { SaveButton } from "./save-button";
 
 export const dynamic = "force-dynamic";
 
@@ -16,15 +17,16 @@ export default async function ItemDetailPage({ params, searchParams }: Props): P
   const { id } = await params;
   const { image_error } = await searchParams;
 
-  // Fetch the item + (if authenticated) the viewer's profile in parallel so
-  // we can detect ownership without serial round-trips. /v1/me only runs
-  // when a session is present; anonymous viewers skip the auth round-trip.
+  // Fetch the item + (if authenticated) the viewer's profile + their save
+  // state in parallel. /v1/me + /save only run when a session is present;
+  // anonymous viewers skip both round-trips.
   const session = await auth();
-  const [itemResult, meResult] = await Promise.all([
+  const [itemResult, meResult, saveResult] = await Promise.all([
     api.getExchangeItem(id).catch((err) => ({ __error: err as unknown })),
+    session?.access_token ? api.me().catch(() => null) : Promise.resolve(null),
     session?.access_token
-      ? api.me().catch(() => null)
-      : Promise.resolve(null),
+      ? api.isItemSaved(id).catch(() => ({ saved: false }))
+      : Promise.resolve({ saved: false }),
   ]);
 
   if ("__error" in itemResult) {
@@ -35,6 +37,7 @@ export default async function ItemDetailPage({ params, searchParams }: Props): P
   const item = itemResult;
   const me = meResult;
   const isOwner = Boolean(me && me.id === item.user_id);
+  const initialSaved = Boolean(session && saveResult.saved);
 
   // The API returns `img_url` pointing at the 800w variant. The pattern is
   // `<base>/<hash>/<width>.webp` — swap the trailing `/800.webp` for `/1600.webp`
@@ -99,6 +102,7 @@ export default async function ItemDetailPage({ params, searchParams }: Props): P
                 {me && item.reserved_by === me.id ? "You reserved this." : "Already reserved."}
               </span>
             )}
+            {session && <SaveButton itemId={item.id} initialSaved={initialSaved} />}
           </div>
         </CardContent>
       </Card>

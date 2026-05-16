@@ -382,6 +382,20 @@ The last big-ticket product feature lands. Non-owner taps "Message owner" on any
   - `/messages` 307 → login when anon; `/messages/<random-uuid>` 307 → login when anon (was 500 mid-development; root cause was a client component pulling `next/headers` via the api client — fixed by introducing server actions for the fetch + send paths).
 - **No new bug-registry entries.** The "client component can't import the auth-aware api client" gotcha is already captured implicitly by Next 15's `next/headers` enforcement; we work around it via server actions, which is the standard pattern.
 
+### 2026-05-16 09:15 UTC — Messages Phase B-1: SSE live
+
+Real-time messaging shipped. Replaces the 5 s poll with EventSource through a same-origin Next route handler that bridges the browser to the API's Bearer-authed SSE endpoint. 30 s fallback poll stays in place as the safety net for blocked-SSE environments.
+
+- **Commits:** `4500160 feat(api): SSE for conversations` + `8164bfc feat(web,infra): EventSource client + Caddy SSE pass-through`.
+- **Images:** `ghcr.io/myndgrid/esharevice-api:8164bfc` (digest `sha256:479e80d52492db922f74bd9677180cf9f89ec5bd8578414b425fd7ef2ba1ce50`); `ghcr.io/myndgrid/esharevice-web:8164bfc` (digest `sha256:f75354339b88a3261f9a04878bcd45099e472d0c88b8322ba6725de36131c306`).
+- **Caddy reroll:** Caddyfile changed (split `api.{$DOMAIN}` into `@sse` handle with `flush_interval -1` + everything-else handle with `encode zstd gzip`). Because Caddy's bind mount pins to the file's inode and `git pull` rewrites the inode (bug-registry `[Build] Docker Single-File Bind Mount Pins to Inode`), the deploy ran `docker compose up -d --force-recreate api web caddy` to ensure Caddy picks up the new config.
+- **Live verification:**
+  - `/v1/health` 200, `/v1/conversations` 401 unauth (regular paths unchanged).
+  - `GET /v1/conversations/<id>/events` 401 unauth — auth gate fires before the stream opens.
+  - Caddy returns no `content-encoding` header on the events path → SSE handle correctly skips gzip (would buffer).
+  - `/api/messages/<id>/events` on the web 401 unauth — same-origin proxy hits `auth()` server-side and rejects before opening the upstream.
+- **No new bug-registry entries.** The bind-mount caveat is already captured; the heartbeat + flush_interval pattern is the textbook fix for the existing `[Network] Long-Running Connection Dropped by Proxy` entry.
+
 ### 2026-05-16 08:00 UTC — Lighthouse audit pass (100/100/100/100)
 
 Production `https://esharevice.com/` mobile audit went from 86 / 92 / 96 / 100 to **100 / 100 / 100 / 100** across Performance / Accessibility / Best Practices / SEO. Full audit: [docs/features/2026-05-16_lighthouse-audit.md](../docs/features/2026-05-16_lighthouse-audit.md).

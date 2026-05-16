@@ -1000,6 +1000,10 @@ These are isolated, reversible, low-risk fixes that don't require the new stack:
 
 ## Progress Log
 
+### 2026-05-16 09:15 UTC — Messages Phase B-1: real-time via SSE
+
+Replaces the 5 s poll with Server-Sent Events. New API route `GET /v1/conversations/{id}/events` streams via Hono's `streamSSE` from an in-process EventEmitter pub/sub; the POST `/messages` handler publishes after each successful insert. Caddy splits `api.{$DOMAIN}` into an `@sse` handle with `flush_interval -1` + no compression, leaving JSON traffic on the existing zstd/gzip handle. Web reaches the stream through a same-origin Next route handler that bridges browser `EventSource` (no header support) to the API's Bearer-authed endpoint; the proxy resolves the session cookie server-side, opens the upstream with the access token, pipes the body, and forwards client abort. 30 s polling stays in place as a fallback for environments that block SSE. Phase B-2 (email-on-new-message) still deferred.
+
 ### 2026-05-16 08:00 UTC — Lighthouse audit: 100/100/100/100
 
 Production home page went from 86 / 92 / 96 / 100 to **100 / 100 / 100 / 100** across Performance / Accessibility / Best Practices / SEO (mobile profile). Three contrast tokens darkened, header auth buttons sized to 44 px tap targets + extra gap, first 3 home cards eager-load with `fetchPriority="high"`, and `app/icon.svg` killed the favicon 404. Full audit: [docs/features/2026-05-16_lighthouse-audit.md](../docs/features/2026-05-16_lighthouse-audit.md).

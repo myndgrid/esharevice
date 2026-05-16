@@ -10,6 +10,12 @@ const nextConfig = {
       // R2 custom domain — long-cached webp variants from the upload pipeline.
       { protocol: "https", hostname: "cdn.esharevice.com" },
     ],
+    // Custom global loader rewrites srcset URLs to the closest pre-built
+    // variant (400/800/1600.webp). Setting this globally is what lets RSC
+    // pages pass `<Image src=... />` without the loader= prop crossing the
+    // function-prop RSC boundary.
+    loader: "custom",
+    loaderFile: "./lib/r2-image-loader.ts",
   },
   experimental: {
     // Default is 1 MB, which trips on the image-upload form action since our

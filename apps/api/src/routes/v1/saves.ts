@@ -1,6 +1,6 @@
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import {
   getDb,
   exchangeItems,
@@ -77,12 +77,13 @@ route.openapi(
     const { id } = c.req.valid("param");
     const db = getDb();
 
-    // Confirm the item exists at all — a 404 here is clearer than silently
-    // returning saved=false for an item that was never real.
+    // Confirm the item exists AND is not archived — a 404 here is clearer
+    // than silently returning saved=false for an item that was never real or
+    // has been removed by its owner.
     const items = await db
       .select({ id: exchangeItems.id })
       .from(exchangeItems)
-      .where(eq(exchangeItems.id, id))
+      .where(and(eq(exchangeItems.id, id), isNull(exchangeItems.archived_at)))
       .limit(1);
     if (items.length === 0) throw new HTTPException(404, { message: "Not Found" });
 
@@ -121,12 +122,13 @@ route.openapi(
     const { id } = c.req.valid("param");
     const db = getDb();
 
-    // Existence check — give a useful 404 instead of letting the FK insert
-    // fail with a wall-of-SQL error.
+    // Existence + active check — give a useful 404 instead of letting the
+    // FK insert fail with a wall-of-SQL error, and refuse saves on items
+    // the owner has archived.
     const items = await db
       .select({ id: exchangeItems.id })
       .from(exchangeItems)
-      .where(eq(exchangeItems.id, id))
+      .where(and(eq(exchangeItems.id, id), isNull(exchangeItems.archived_at)))
       .limit(1);
     if (items.length === 0) throw new HTTPException(404, { message: "Not Found" });
 
@@ -194,7 +196,13 @@ route.openapi(
     const cursor = decodeCursor(cursorRaw);
     const db = getDb();
 
-    const conditions = [eq(exchangeItemSaves.user_id, u.id)];
+    // Always hide archived items from the listing — a save row may still
+    // exist (we don't cascade delete the saves on archive), but the user
+    // shouldn't see the dead listing in their /saved page.
+    const conditions = [
+      eq(exchangeItemSaves.user_id, u.id),
+      isNull(exchangeItems.archived_at),
+    ];
     if (cursor) {
       // Tuple comparison on (saves.created_at, items.id) for stable cursor.
       conditions.push(

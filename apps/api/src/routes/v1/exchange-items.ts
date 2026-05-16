@@ -1,6 +1,6 @@
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { getDb, exchangeItems, type ExchangeItemRow } from "@esharevice/db";
 import {
   CursorQuery,
@@ -81,7 +81,10 @@ route.openapi(
     const cursor = decodeCursor(cursorRaw);
     const db = getDb();
 
-    const conditions = [];
+    // Soft-delete filter — every read of exchange_items excludes archived
+    // rows. The 0002 migration's partial index covers the (created_at desc,
+    // id desc) tuple ONLY for active rows, so this WHERE clause is fast.
+    const conditions = [isNull(exchangeItems.archived_at)];
     if (cursor) {
       // Tuple comparison: (created_at, id) < (cursor.ts, cursor.id). Postgres native.
       conditions.push(
@@ -95,7 +98,7 @@ route.openapi(
     const rows = await db
       .select()
       .from(exchangeItems)
-      .where(conditions.length ? and(...conditions) : undefined)
+      .where(and(...conditions))
       .orderBy(desc(exchangeItems.created_at), desc(exchangeItems.id))
       .limit(limit + 1);
 
@@ -126,7 +129,11 @@ route.openapi(
   async (c) => {
     const { id } = c.req.valid("param");
     const db = getDb();
-    const rows = await db.select().from(exchangeItems).where(eq(exchangeItems.id, id)).limit(1);
+    const rows = await db
+      .select()
+      .from(exchangeItems)
+      .where(and(eq(exchangeItems.id, id), isNull(exchangeItems.archived_at)))
+      .limit(1);
     const row = rows[0];
     if (!row) throw new HTTPException(404, { message: "Not Found" });
     return c.json(toApiItem(row), 200);
@@ -210,7 +217,7 @@ route.openapi(
     const existing = await db
       .select()
       .from(exchangeItems)
-      .where(eq(exchangeItems.id, id))
+      .where(and(eq(exchangeItems.id, id), isNull(exchangeItems.archived_at)))
       .limit(1);
     const row = existing[0];
     if (!row) throw new HTTPException(404, { message: "Not Found" });
@@ -263,7 +270,11 @@ route.openapi(
     if (!u) throw new HTTPException(401, { message: "no user attached" });
     const { id } = c.req.valid("param");
     const db = getDb();
-    const existing = await db.select().from(exchangeItems).where(eq(exchangeItems.id, id)).limit(1);
+    const existing = await db
+      .select()
+      .from(exchangeItems)
+      .where(and(eq(exchangeItems.id, id), isNull(exchangeItems.archived_at)))
+      .limit(1);
     const row = existing[0];
     if (!row) throw new HTTPException(404, { message: "Not Found" });
     if (row.user_id === u.id) {
@@ -286,7 +297,13 @@ route.openapi(
         reserved_at: new Date(),
         updated_at: new Date(),
       })
-      .where(and(eq(exchangeItems.id, id), eq(exchangeItems.reserved, false)))
+      .where(
+        and(
+          eq(exchangeItems.id, id),
+          eq(exchangeItems.reserved, false),
+          isNull(exchangeItems.archived_at),
+        ),
+      )
       .returning();
     const u2 = updated[0];
     if (!u2) {
@@ -360,7 +377,11 @@ route.openapi(
     }
 
     const db = getDb();
-    const rows = await db.select().from(exchangeItems).where(eq(exchangeItems.id, id)).limit(1);
+    const rows = await db
+      .select()
+      .from(exchangeItems)
+      .where(and(eq(exchangeItems.id, id), isNull(exchangeItems.archived_at)))
+      .limit(1);
     const row = rows[0];
     if (!row) throw new HTTPException(404, { message: "Not Found" });
     if (row.user_id !== u.id) {
@@ -419,6 +440,62 @@ route.openapi(
     const u2 = updated[0];
     if (!u2) throw new HTTPException(500, { message: "update returned no rows" });
     return c.json(toApiItem(u2), 200);
+  },
+);
+
+// ─────────────────────── DELETE /v1/exchange-items/:id
+//
+// Soft delete — sets `archived_at = now()`. The row stays in the table to
+// preserve FK references (saves, reserved_by) and audit trail, but is
+// invisible to every read in the API. Idempotent: calling DELETE on an
+// already-archived row returns 204 (the desired end state is reached).
+//
+// Owner-only. Non-owners get 403. We deliberately do NOT 404 a non-owner
+// who hits a real id — that would leak the existence of items they don't
+// own. Same posture as the edit endpoint.
+route.openapi(
+  createRoute({
+    method: "delete",
+    path: "/exchange-items/{id}",
+    tags: ["exchange-items"],
+    summary: "Archive (soft-delete) an exchange item the authenticated user owns.",
+    security: [{ Bearer: [] }],
+    middleware: [requireAuth, idempotency()] as const,
+    request: { params: IdParamSchema },
+    responses: {
+      204: { description: "Archived (no content)" },
+      401: { description: "Unauthenticated", content: problemContent },
+      403: { description: "Not the item owner", content: problemContent },
+      404: { description: "Item not found", content: problemContent },
+    },
+  }),
+  async (c) => {
+    const u = c.get("user");
+    if (!u) throw new HTTPException(401, { message: "no user attached" });
+    const { id } = c.req.valid("param");
+    const db = getDb();
+
+    // Read INCLUDING archived rows so a re-DELETE on an already-archived
+    // listing is treated as a no-op rather than 404. The owner check then
+    // works the same way regardless of state.
+    const existing = await db
+      .select()
+      .from(exchangeItems)
+      .where(eq(exchangeItems.id, id))
+      .limit(1);
+    const row = existing[0];
+    if (!row) throw new HTTPException(404, { message: "Not Found" });
+    if (row.user_id !== u.id) {
+      throw new HTTPException(403, { message: "Only the item owner can delete this listing" });
+    }
+    // Already archived? Nothing to do — same end state.
+    if (row.archived_at) return new Response(null, { status: 204 });
+
+    await db
+      .update(exchangeItems)
+      .set({ archived_at: new Date(), updated_at: new Date() })
+      .where(eq(exchangeItems.id, id));
+    return new Response(null, { status: 204 });
   },
 );
 

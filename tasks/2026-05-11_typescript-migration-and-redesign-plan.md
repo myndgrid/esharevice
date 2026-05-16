@@ -1,7 +1,7 @@
 # Task: TypeScript Migration & Frontend Redesign Plan
 
 **Created:** 2026-05-11 00:00 UTC
-**Last Updated:** 2026-05-16 16:26 UTC
+**Last Updated:** 2026-05-16 16:57 UTC
 **Status:** v3.4 — weeks 1-3 shipped + first web slice live (OIDC login + design system + home/profile pages)
 
 ---
@@ -999,6 +999,10 @@ These are isolated, reversible, low-risk fixes that don't require the new stack:
 ---
 
 ## Progress Log
+
+### 2026-05-16 16:57 UTC — A11y deep pass
+
+Audit-and-fix pass scoped to the gaps automated tooling can't catch. Started from a Lighthouse a11y 100 + visibly-labeled buttons + already-present aria-labels on icon-only links + every page has `<main>`. Found five real fixes: (1) skip-to-content link in the layout (first focusable, target is a wrapper `<div id="main-content" tabIndex={-1}>`); (2) `<label>` + `aria-label` on the conversation composer textarea (previously placeholder-only); (3) `role="log"` + `aria-live="polite"` on the message list so SR announces new SSE messages; (4) Send button keeps "Send" text + uses `aria-busy` instead of swapping to "…" mid-send; (5) home + saved card grids `<div>` → `<ul>`/`<li>` so SR users hear "list, N items" instead of "N links". Focus traps not in scope — no modals exist yet. Full audit + design notes in [docs/features/2026-05-16_a11y-deep-pass.md](../docs/features/2026-05-16_a11y-deep-pass.md).
 
 ### 2026-05-16 16:26 UTC — PWA basics + brand-mark refresh
 

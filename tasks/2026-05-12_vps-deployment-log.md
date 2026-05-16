@@ -1,7 +1,7 @@
 # VPS Deployment Log — e-Sharevice (esharevice.com on Hostinger)
 
 **Created:** 2026-05-12 22:00 UTC
-**Last Updated:** 2026-05-16 16:26 UTC
+**Last Updated:** 2026-05-16 16:57 UTC
 **Status:** Stack live; Authentik fully provisioned; typed Hono /v1 API serving real routes
 
 The runbook's prerequisites were sourced from `tasks/.env.creds` (gitignored). The user opted for the "fast path" (option B in the kickoff exchange): use the master credentials once for setup, rotate after. **All four credentials below MUST be rotated** before this is treated as production.
@@ -493,3 +493,17 @@ Production `https://esharevice.com/` mobile audit went from 86 / 92 / 96 / 100 t
 - **Image:** `ghcr.io/myndgrid/esharevice-web:702a166` (`sha256:30bf7008…`), built with `--no-cache-filter check`; real layer push. API unchanged.
 - **Deploy:** web-only `docker compose up -d --force-recreate web`. Healthy in ~9 s. No DB migration, no env changes.
 - **Verification:** running web container digest matches push exactly. All eight PWA + favicon surfaces return 200: `/`, `/manifest.webmanifest` (correct JSON shape), `/sw.js` (Workbox precache list rendered), `/icon-192.png`, `/icon-512.png`, `/icon-maskable-512.png`, `/apple-touch-icon.png`, `/favicon.ico`. Manual visual check pending: hard-refresh the site and confirm the tab favicon is now the two-circle mark instead of the "e" tile.
+
+### 2026-05-16 16:20 UTC — Drop white background on logo icons
+
+Web-only re-roll. The favicon + apple-touch + icon-192 + icon-512 were rendering as the logo on a white square (a visual white box around the two circles in browser tabs and home screens). Regenerated the four flat icons with transparent backgrounds; kept the maskable-512 variant white-backed since Android masks the full canvas and transparency there would expose the launcher's default tile color. Verified `hasAlpha=true` + top-left pixel `(0,0,0,0)` on both the local and production icon-512.png. Image `ghcr.io/myndgrid/esharevice-web:6a9a1d6` → `sha256:7e36df95…`.
+
+Sentry triage: ESHAREVICE-WEB-3 at 15:14:26 UTC — `ApiError: /v1/conversations/.../messages → 502 Request failed` during server-render of `/messages/[id]`. Same single-replica-restart class as WEB-1 (page-render variant; WEB-2 was the SSE-stream variant). Falls in the email-prefs + per-conversation badges deploy window when the API container was force-recreated twice in succession. Not a real bug; eliminating it requires multi-replica + rolling restart infra.
+
+### 2026-05-16 16:57 UTC — A11y deep pass
+
+- **What shipped:** five targeted screen-reader experience improvements after a full audit. (1) Skip-to-content link in the root layout, hidden until focused; (2) `<label>` + `aria-label` on the conversation composer textarea (was placeholder-only); (3) `role="log"` + `aria-live="polite"` on the message list so SR announces new SSE messages as they arrive; (4) Send button keeps the text "Send" + uses `aria-busy` instead of swapping to "…" mid-send; (5) home + saved card grids converted from `<div>`-of-`<Link>`s to semantic `<ul>`/`<li>` with aria-labels. Full audit + design notes in [docs/features/2026-05-16_a11y-deep-pass.md](../docs/features/2026-05-16_a11y-deep-pass.md).
+- **Audit confirmed several already-good areas:** no icon-only buttons without labels; every page has a `<main>` landmark; focus-visible rings on all interactive elements; image alts present; form fields wrap their inputs in `<label>`; Lighthouse a11y 100. The deep-pass items were specifically the cases where syntactically-valid markup is semantically incomplete.
+- **Not in scope:** focus traps. No modals/dialogs exist anywhere in the app yet; nothing to trap focus inside. Revisit when the first modal lands (likely the reservation-cancellation flow or a settings prompt).
+- **Image:** web only — API unchanged. Build/push/deploy details land in this entry once the roll completes.
+- **Verification target:** image digest matches push exactly; home page HTML contains the skip-to-content link + `id="main-content"` target; `aria-label="Exchange listings"` on the home grid `<ul>`; conversation page's textarea has the label association; aria-busy attribute toggles correctly under pending state (manual check).

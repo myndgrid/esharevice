@@ -88,3 +88,26 @@ jobs:
         env:
           DATABASE_URL: postgresql://esharevice:esharevice@localhost:5432/esharevice
         run: pnpm test
+
+  # Post-deploy regression net: runs after every push to main against the
+  # live production URL, asserts per-category Lighthouse scores. NOT a PR
+  # gate (PRs haven't deployed yet — there's nothing for LHCI to measure).
+  # Slightly conservative thresholds vs the 100/100/100/100 the audit hit,
+  # because CI runners are noisy and Lighthouse scores wobble ±3 between
+  # runs from CPU contention alone.
+  lighthouse:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Lighthouse CI against production
+        uses: treosh/lighthouse-ci-action@v12
+        with:
+          configPath: ./lighthouserc.json
+          # `temporary-public-storage` uploads the full HTML report and prints
+          # a URL in the job summary, so when scores drop we can dig in
+          # immediately instead of re-running locally.
+          uploadArtifacts: true
+          temporaryPublicStorage: true

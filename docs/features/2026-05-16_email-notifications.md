@@ -1,17 +1,21 @@
 # Feature: Email owner on item reservation
 
 **Created:** 2026-05-16 06:30 UTC
-**Last Updated:** 2026-05-16 06:30 UTC
-**Status:** Live. Production VPS has `RESEND_API_KEY` + `EMAIL_FROM=e-Sharevice <noreply@esharevice.com>` set. Domain `esharevice.com` is verified on Resend (was already in use for Authentik password-reset emails).
+**Last Updated:** 2026-05-16 07:00 UTC
+**Status:** Live. Three email triggers wired:
+1. Owner of an item gets notified when it's reserved (the original slice).
+2. Everyone who saved the item gets notified when it's reserved by someone else.
+3. Everyone who saved the item gets notified when the owner archives the listing.
 
-When a user reserves an item, the owner gets an email saying so. First piece of transactional email from the app itself (Authentik already sends password-reset / verification emails on its own SMTP wiring).
+Production VPS has `RESEND_API_KEY` + `EMAIL_FROM=e-Sharevice <noreply@esharevice.com>` set. Domain `esharevice.com` is verified on Resend (was already in use for Authentik password-reset emails).
 
 ## Routes / Modules
 
 | File | Role |
 |---|---|
-| [apps/api/src/lib/email.ts](../../apps/api/src/lib/email.ts) | Lazy Resend client + `sendReservedEmail({ to, ownerName, reserverName, itemService, itemUrl })`. Never throws — all failures logged + reported to Sentry. |
-| [apps/api/src/routes/v1/exchange-items.ts](../../apps/api/src/routes/v1/exchange-items.ts) | Reserve handler now looks up the owner's email + name from `users` after the race-safe UPDATE succeeds and fires the email **fire-and-forget**. The 200 response to the reserver is never delayed by an email round-trip. |
+| [apps/api/src/lib/email.ts](../../apps/api/src/lib/email.ts) | Lazy Resend client + three exported helpers (`sendReservedEmail`, `sendItemReservedEmailToSaver`, `sendItemArchivedEmailToSaver`) on a shared `sendTransactional` core. Every helper is non-throwing — all failures logged + reported to Sentry. |
+| [apps/api/src/lib/saves-recipients.ts](../../apps/api/src/lib/saves-recipients.ts) | `getSaversToNotify(itemId, excludeUserIds)` — joins `exchange_item_saves` with `users` for everyone who bookmarked `itemId` minus the actors who already know. `recipientDisplayName` builds the friendly greeting. |
+| [apps/api/src/routes/v1/exchange-items.ts](../../apps/api/src/routes/v1/exchange-items.ts) | Reserve handler fires the owner email and then fans out to savers (`exclude=[reserver, owner]`). DELETE handler fans out to savers (`exclude=[owner]`) only on the first archive (re-DELETE is a no-op, no re-spam). All sends happen inside a `void (async () => { ... })()` so the 2xx response to the actor is never delayed. |
 | [apps/api/src/env.ts](../../apps/api/src/env.ts) | Optional `RESEND_API_KEY`, `EMAIL_FROM`, `WEB_PUBLIC_URL`. `emailConfigured()` helper. Empty-string → undefined transforms (same pattern as R2 vars). |
 | [infra/docker-compose.yml](../../infra/docker-compose.yml) | Threads the three env vars into the api service with empty defaults + `${DOMAIN}`-based fallback for `WEB_PUBLIC_URL`. |
 
@@ -32,8 +36,17 @@ When a user reserves an item, the owner gets an email saying so. First piece of 
 | `EMAIL_FROM` | FROM address — must be on a verified domain. Recommended: `e-Sharevice <noreply@your-domain.com>` (display name + address) |
 | `WEB_PUBLIC_URL` | Public URL for link building. Optional; compose defaults to `https://${DOMAIN}` |
 
+## Saver fan-out details
+
+- **Recipient set on reserve:** `getSaversToNotify(itemId, [reserverId, ownerId])`. The reserver is the actor; the owner gets the primary reserved-email already. Anyone else who saved the item gets one notification.
+- **Recipient set on archive:** `getSaversToNotify(itemId, [ownerId])`. The owner is archiving their own listing; everyone else who saved it learns the listing is gone.
+- **No batching.** The send is a `for ... of savers` loop, one email per recipient. Each call is awaited inside the IIFE but the IIFE itself isn't awaited by the handler. Total wall-time scales linearly with saves count; for an item with N savers, the IIFE finishes well after the handler's response. Bound: we expect single-digit savers per item for the foreseeable future. If saves explode for a viral listing, switch to a Redis/BullMQ queue worker.
+- **Deduplication.** `notInArray` on the user_id excludes the actors. No risk of double-emailing a user who's both the reserver and a saver of their own item (edge case, but the exclusion handles it).
+- **No CTA on the archive email.** The listing is gone — no link to show. The text body says so and points the user back to the home page.
+
 ## Changelog
 
 | Date | Change |
 |---|---|
-| 2026-05-16 06:30 UTC | Initial documentation; live with `noreply@esharevice.com` (verified) on production. |
+| 2026-05-16 06:30 UTC | Initial documentation; live with `noreply@esharevice.com` (verified) on production. Owner email on reserve. |
+| 2026-05-16 07:00 UTC | Saver fan-out — savers get notified on reserve (by someone other than themselves) and on archive (by the owner). Reserve handler now sends owner email + savers loop; DELETE handler fires the savers loop on first archive only. |

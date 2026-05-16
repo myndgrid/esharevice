@@ -352,3 +352,17 @@ Two slices in one section since they shipped back-to-back.
 - **Image:** `ghcr.io/myndgrid/esharevice-api:0b00409` (digest `sha256:9630bf56bd8c711104412b481721ba5cb345f9898d2e84b86cd9290f63277279`). Web image unchanged.
 - **Roll:** `docker compose up -d --force-recreate api`. Healthy in 6 s; api container's env confirms both new vars are populated.
 - Domain `esharevice.com` was already verified for `noreply@esharevice.com` (Authentik has been sending password-reset emails since week 2), so the first real reserve from a non-owner should land in their inbox.
+
+### 2026-05-16 07:00 UTC — Saver-side email fan-out
+
+Builds on the prior email slice. Now: anyone who bookmarked an item gets notified when it's reserved (by someone else) or archived (by the owner). Same fire-and-forget contract — handler never awaits the email loop, helpers never throw.
+
+- **Commit:** `9e49f06 feat(email): notify savers when an item is reserved or archived`.
+- **Image:** `ghcr.io/myndgrid/esharevice-api:9e49f06`. Web image unchanged (this slice is API-only).
+- **Roll:** `docker compose up -d --force-recreate api`. Healthy in 6 s.
+- **Refactor:** extracted `sendTransactional` + `esc` + `bodyHtml` builder in `lib/email.ts` so the three notification kinds share the boilerplate (Resend init, error swallowing, HTML shell). Plus new `lib/saves-recipients.ts` for the savers-minus-actors query.
+- **Recipient exclusions:**
+  - Reserve fan-out excludes `[reserverId, ownerId]` — the reserver did the action; the owner gets the dedicated "your listing was reserved" email already.
+  - Archive fan-out excludes `[ownerId]` — they're the actor.
+  - A re-DELETE on an already-archived listing is a no-op + skips the savers notification entirely (no re-spam).
+- **No new bug-registry entries.** Slice was clean — no surprises around Resend, the DB queries, or fan-out timing.

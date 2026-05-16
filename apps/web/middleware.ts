@@ -110,7 +110,7 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
   } catch (err) {
     // Refresh failed (revoked, expired, Authentik downtime). Clear cookies
     // so the next render goes through requireAuth → /api/auth/login.
-    // eslint-disable-next-line no-console
+     
     console.warn("[middleware] refresh failed:", err instanceof Error ? err.message : err);
     let res = NextResponse.next();
     res = clearSessionCookieOn(res);

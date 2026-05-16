@@ -44,7 +44,8 @@ export function Avatar({
       {...rest}
     >
       {src ? (
-        // eslint-disable-next-line @next/next/no-img-element
+        // packages/ui is framework-agnostic — consumers (web app) may
+        // wrap with next/image if they care about LCP. Plain <img> here.
         <img src={src} alt={alt ?? name ?? ""} className="size-full object-cover" />
       ) : (
         <span>{label}</span>

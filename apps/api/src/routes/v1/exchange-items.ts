@@ -345,7 +345,7 @@ route.openapi(
       } catch (err) {
         // sendReservedEmail already swallows, but defensive belt-and-suspenders
         // for the email-side helper code itself.
-        // eslint-disable-next-line no-console
+         
         console.warn("[reserve] notification setup failed:", err);
       }
     })();

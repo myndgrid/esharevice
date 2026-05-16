@@ -58,13 +58,8 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
-      # Lint is intentionally OFF in CI. The packages were authored against
-      # ESLint 8 (`.eslintrc.*`); ESLint 9 introduced the flat-config
-      # requirement and the migration hasn't been done. Re-enable this step
-      # in tandem with adding a root `eslint.config.mjs` + updating each
-      # package's lint script. Tracked separately.
-      # - name: Lint
-      #   run: pnpm lint
+      - name: Lint
+        run: pnpm lint
 
       # Wait for Postgres + apply schema. Extensions first (citext / pgcrypto),
       # then each Drizzle migration in order. `psql -v ON_ERROR_STOP=1` so a

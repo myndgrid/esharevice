@@ -33,7 +33,7 @@ export function onError(err: Error, c: Context): Response {
     };
   } else {
     // Truly unexpected — log locally + report to Sentry. Treat as 500.
-    // eslint-disable-next-line no-console
+     
     console.error(`[ERROR] ${c.req.method} ${c.req.path}`, err);
     captureException(err);
     problem = {

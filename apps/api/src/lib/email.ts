@@ -44,12 +44,12 @@ export async function sendReservedEmail(input: ReservedEmailInput): Promise<void
     });
     if (error) {
       // The most common cause is "domain not verified" — surface clearly.
-      // eslint-disable-next-line no-console
+       
       console.warn("[email] resend rejected:", error.name, error.message);
       captureException(new Error(`Resend rejected: ${error.name} ${error.message}`));
     }
   } catch (err) {
-    // eslint-disable-next-line no-console
+     
     console.warn("[email] resend threw:", err);
     captureException(err);
   }

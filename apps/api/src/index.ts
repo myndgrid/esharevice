@@ -83,13 +83,13 @@ app.notFound(notFound);
 const server = serve(
   { fetch: app.fetch, port: env.API_PORT, hostname: "0.0.0.0" },
   (info) => {
-    // eslint-disable-next-line no-console
+     
     console.log(`[api] listening on http://${info.address}:${info.port}`);
   },
 );
 
 const shutdown = (signal: NodeJS.Signals): void => {
-  // eslint-disable-next-line no-console
+   
   console.log(`[api] received ${signal}, shutting down`);
   server.close(() => process.exit(0));
   setTimeout(() => process.exit(1), 10_000).unref();
@@ -99,7 +99,7 @@ process.on("SIGTERM", shutdown);
 process.on("SIGINT", shutdown);
 
 process.on("unhandledRejection", (reason) => {
-  // eslint-disable-next-line no-console
+   
   console.error("[api] unhandledRejection", reason);
 });
 

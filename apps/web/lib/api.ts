@@ -2,6 +2,7 @@ import {
   cursorPage,
   ExchangeItem,
   ExchangeItemCreate,
+  ExchangeItemUpdate,
   SaveState,
   UserPublic,
 } from "@esharevice/shared";
@@ -142,6 +143,16 @@ export const api = {
     const opts: Options = { method: "POST", body, authed: true, revalidate: false };
     if (idempotencyKey) opts.idempotencyKey = idempotencyKey;
     return call("/v1/exchange-items", ExchangeItem, opts);
+  },
+
+  updateExchangeItem: (
+    id: string,
+    body: z.infer<typeof ExchangeItemUpdate>,
+    idempotencyKey?: string,
+  ) => {
+    const opts: Options = { method: "PUT", body, authed: true, revalidate: false };
+    if (idempotencyKey) opts.idempotencyKey = idempotencyKey;
+    return call(`/v1/exchange-items/${id}`, ExchangeItem, opts);
   },
 
   uploadExchangeItemImage: (

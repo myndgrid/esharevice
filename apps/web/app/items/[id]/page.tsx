@@ -94,7 +94,12 @@ export default async function ItemDetailPage({ params, searchParams }: Props): P
               </Link>
             )}
             {session && isOwner && (
-              <span className="text-xs text-fg-subtle">You posted this item.</span>
+              <>
+                <Link href={`/items/${item.id}/edit`}>
+                  <Button variant="secondary" size="sm">Edit</Button>
+                </Link>
+                <span className="text-xs text-fg-subtle">You posted this item.</span>
+              </>
             )}
             {session && !isOwner && !item.reserved && <ReserveButton itemId={item.id} />}
             {session && !isOwner && item.reserved && (

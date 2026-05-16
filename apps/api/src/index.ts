@@ -1,3 +1,9 @@
+// Sentry's runtime instrumentation has to install BEFORE any other module
+// loads — pulling this in first patches the HTTP / Postgres clients so
+// downstream code is observable. The file no-ops cleanly when SENTRY_DSN
+// isn't set, so local dev + tests are unaffected.
+import "./instrument.js";
+
 import { serve } from "@hono/node-server";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { swaggerUI } from "@hono/swagger-ui";

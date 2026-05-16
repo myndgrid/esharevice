@@ -34,14 +34,21 @@ const LOGO_SVG = `<svg width="120" height="120" viewBox="-68.75 -43.75 137.5 87.
 </svg>`;
 
 /**
- * Render the logo SVG onto a white square tile.
+ * Render the logo SVG onto a square tile.
  *
  * `logoScale` is the fraction of the tile width the LOGO bounds occupy.
  *   - Standard icons: 0.80 — logo fills nicely but with breathing room.
  *   - Maskable: 0.70 — logo stays inside the 80% safe zone after masking.
  *   - Apple: 0.80 — iOS adds its own rounded mask + drop shadow.
+ *
+ * `background` controls the tile fill. Pass `null` for a fully transparent
+ * tile — used for the standard PWA icons + the favicon so the logo reads
+ * as just-two-circles on dark browser tabs / dark home screens, instead
+ * of sitting inside a visible white square. The maskable variant still
+ * needs a solid fill because Android masks the entire canvas; without
+ * one, the masked area would show as the launcher's default background.
  */
-async function makeTile(size, logoScale, outPath) {
+async function makeTile(size, logoScale, outPath, { background = null } = {}) {
   const logoSize = Math.round(size * logoScale);
   const logoPng = await sharp(Buffer.from(LOGO_SVG), { density: 1024 })
     .resize({ width: logoSize, height: logoSize, fit: "contain", background: { r: 255, g: 255, b: 255, alpha: 0 } })
@@ -53,7 +60,7 @@ async function makeTile(size, logoScale, outPath) {
       width: size,
       height: size,
       channels: 4,
-      background: { r: 255, g: 255, b: 255, alpha: 1 },
+      background: background ?? { r: 0, g: 0, b: 0, alpha: 0 },
     },
   })
     .composite([{ input: logoPng, gravity: "center" }])
@@ -61,12 +68,14 @@ async function makeTile(size, logoScale, outPath) {
     .toBuffer();
 
   await writeFile(outPath, tile);
-  console.log(`  wrote ${outPath} (${size}×${size}, logo ${Math.round(logoScale * 100)}%)`);
+  const bg = background ? `bg ${background.r},${background.g},${background.b}` : "transparent";
+  console.log(`  wrote ${outPath} (${size}×${size}, logo ${Math.round(logoScale * 100)}%, ${bg})`);
 }
 
 /**
  * Generate the raw square-tile PNG bytes at a given size (no file write).
- * Used by both the PWA-PNG flow and the favicon.ico assembly.
+ * Used for the favicon.ico assembly; the tile is fully transparent so the
+ * favicon reads as just-two-circles on dark browser tabs.
  */
 async function renderTilePng(size, logoScale) {
   const logoSize = Math.round(size * logoScale);
@@ -85,7 +94,7 @@ async function renderTilePng(size, logoScale) {
       width: size,
       height: size,
       channels: 4,
-      background: { r: 255, g: 255, b: 255, alpha: 1 },
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
     },
   })
     .composite([{ input: logoPng, gravity: "center" }])
@@ -98,7 +107,13 @@ async function main() {
   console.log("Generating PWA icons…");
   await makeTile(192, 0.8, resolve(publicDir, "icon-192.png"));
   await makeTile(512, 0.8, resolve(publicDir, "icon-512.png"));
-  await makeTile(512, 0.7, resolve(publicDir, "icon-maskable-512.png"));
+  // Maskable icons MUST fill the canvas — the OS mask uses the full
+  // pixel area. Transparent here would show launcher background.
+  // White matches the brand light-mode background and reads clean
+  // through circle/squircle/rounded-square masks.
+  await makeTile(512, 0.7, resolve(publicDir, "icon-maskable-512.png"), {
+    background: { r: 255, g: 255, b: 255, alpha: 1 },
+  });
   await makeTile(180, 0.8, resolve(publicDir, "apple-touch-icon.png"));
 
   console.log("Generating favicon.ico…");

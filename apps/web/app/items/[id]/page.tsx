@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Button, Card, CardContent } from "@esharevice/ui";
@@ -59,12 +60,18 @@ export default async function ItemDetailPage({ params, searchParams }: Props): P
       <Card>
         <CardContent>
           {fullImageUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            // Width/height props are hints for layout space + srcset aspect;
+            // CSS controls actual display size. We declare a 4:3 nominal
+            // (matches the upload pipeline's typical output) and let
+            // max-h-[60vh] + object-cover handle non-4:3 sources gracefully.
+            <Image
               src={fullImageUrl}
               alt={item.service}
+              width={1600}
+              height={1200}
+              priority
+              sizes="(max-width: 768px) 100vw, 768px"
               className="mb-5 max-h-[60vh] w-full rounded-md border border-border object-cover"
-              loading="eager"
             />
           )}
 

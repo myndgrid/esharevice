@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useActionState, useId, useRef, useState } from "react";
 import { Button } from "@esharevice/ui";
 import type { ExchangeItem } from "@esharevice/shared";
@@ -170,10 +171,12 @@ function ImagePicker({ currentUrl }: { currentUrl: string | null }): React.React
     <div className="grid gap-1.5">
       <span className="text-sm font-medium text-fg">Photo</span>
       {currentUrl && !preview && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        <Image
           src={currentUrl}
           alt="Current listing photo"
+          width={1600}
+          height={1200}
+          sizes="(max-width: 768px) 100vw, 768px"
           className="mb-2 max-h-56 w-full rounded-md border border-border object-cover"
         />
       )}

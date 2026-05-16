@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { Card, CardContent } from "@esharevice/ui";
 import type { ExchangeItem } from "@esharevice/shared";
@@ -71,14 +72,18 @@ function ExchangeItemCard({
       <Card>
         <CardContent>
           {item.img_url && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={item.img_url}
-              alt={item.service}
-              loading={priority ? "eager" : "lazy"}
-              fetchPriority={priority ? "high" : "auto"}
-              className="mb-3 aspect-[4/3] w-full rounded-md object-cover"
-            />
+            <div className="relative mb-3 aspect-[4/3] w-full overflow-hidden rounded-md">
+              <Image
+                src={item.img_url}
+                alt={item.service}
+                fill
+                priority={priority}
+                // Roughly: full viewport width on mobile, ~half on tablet,
+                // ~third on desktop (matches the home-grid breakpoints).
+                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                className="object-cover"
+              />
+            </div>
           )}
           <div className="mb-2 flex items-baseline justify-between gap-2">
             <h2 className="text-lg font-semibold tracking-tight">{item.provider}</h2>

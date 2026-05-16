@@ -88,4 +88,8 @@ Stand up the backend half of image upload + close the idempotency-key gap that's
 
 ## Outcome
 
-Week 4 backend foundation is shipped + tested + deployed. The upload endpoint is gated behind R2 configuration (returns 503 until the dashboard step is done). Idempotency middleware is wired across every unsafe `/v1/exchange-items` route. Tests run in <1 s with mocked R2 + Redis. The remaining R2 work is ~2 minutes of clicking in the Cloudflare dashboard (create the S3-compatible API token, bind `cdn.esharevice.com` as a custom domain, paste five env vars into `infra/.env`, `docker compose up -d --force-recreate api`).
+Week 4 backend foundation is shipped + tested + deployed. The upload endpoint is gated behind R2 configuration (returns 503 until the dashboard step is done). Idempotency middleware is wired across every unsafe `/v1/exchange-items` route. Tests run in <1 s with mocked R2 + Redis.
+
+### 2026-05-16 02:55 UTC follow-up — R2 wired live
+
+User created the S3-compatible API token + bound `cdn.esharevice.com` to the bucket via the Cloudflare dashboard and pasted the five keys into `.env.creds`. End-to-end test with the SDK (PUT + GET against `esharevice-images`) passed; same object fetched via `https://cdn.esharevice.com/probe/...` → 200. Five env vars were appended to the VPS `infra/.env` and to local `apps/api/.env`, api container recreated, probe object cleaned up. The 503 branch on `POST /v1/exchange-items/{id}/image` is now unreachable — the endpoint will actually run the sharp pipeline on the next authenticated upload.

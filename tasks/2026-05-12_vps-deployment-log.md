@@ -211,3 +211,10 @@ The web app moves from `https://app.esharevice.com` to the root domain `https://
 - **Follow-ups (not blocking):**
   - The legacy `https://app.esharevice.com/api/auth/callback` is still in Authentik's redirect_uris allowlist. Safe to remove after a few days once no traffic originates from the old hostname; the blueprint already includes it for now so an Authentik restart doesn't drop it.
   - Cookies on `app.esharevice.com` are host-scoped and will orphan-expire on existing browsers within 30 days (session) or ~15 minutes (access). Active users will re-login at the root domain on next visit. No mitigation needed.
+
+### 2026-05-16 02:55 UTC — R2 image upload wired live
+
+- **What changed:** five R2-related env vars appended to `/opt/esharevice/infra/.env` on the VPS — `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET=esharevice-images`, `CDN_BASE_URL=https://cdn.esharevice.com`. S3-compatible API keys were created in the Cloudflare R2 dashboard (Object Read & Write, scoped to a single bucket); `cdn.esharevice.com` was bound as a custom domain via the dashboard, SSL active, ownership active.
+- **Roll:** `docker compose up -d --force-recreate api`. Healthy in <1 s.
+- **Live verification:** PUT + GET via the S3 SDK against `esharevice-images` worked (probe object 33 bytes, fetched back byte-for-byte). Same object fetched via `https://cdn.esharevice.com/probe/r2-credentials-test.txt` → 200. Probe object deleted afterwards. `POST /v1/exchange-items/{id}/image` still 401s without auth (the auth gate fires before the configuration check); the `503 Image storage is not configured yet` branch is now unreachable.
+- **Captured pattern:** the user provided the R2 keys with literal spaces in the variable NAMES (`cloudflare_Access Key ID=...`) inside `.env.creds`. Shell sourcing chokes on spaces in var names; we extract with `grep | cut` instead. Cosmetic for now — flagging in case we later automate `.env.creds` loading.

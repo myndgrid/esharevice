@@ -11,6 +11,7 @@ import { notFound, onError } from "./middleware/error.js";
 import health from "./routes/health.js";
 import me from "./routes/v1/me.js";
 import exchangeItems from "./routes/v1/exchange-items.js";
+import saves from "./routes/v1/saves.js";
 import type { AppEnv } from "./app.js";
 
 const app = new OpenAPIHono<AppEnv>();
@@ -45,6 +46,7 @@ app.route("/", health);
 app.route("/v1", health); // also expose /v1/health
 app.route("/v1", me);
 app.route("/v1", exchangeItems);
+app.route("/v1", saves);
 
 // ─────────────────────── OpenAPI spec + Swagger UI
 app.doc("/v1/openapi.json", {

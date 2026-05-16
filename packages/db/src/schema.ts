@@ -4,6 +4,7 @@ import {
   customType,
   index,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -73,10 +74,37 @@ export const exchangeItems = pgTable(
   ],
 );
 
+/**
+ * exchange_item_saves — many-to-many "user bookmarked this item" mapping.
+ * Composite PK on (user_id, item_id) makes the relationship idempotent at the
+ * SQL layer; INSERT … ON CONFLICT DO NOTHING is the canonical add path.
+ * Both FKs cascade so a user/item delete cleans up associated rows.
+ */
+export const exchangeItemSaves = pgTable(
+  "exchange_item_saves",
+  {
+    user_id: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    item_id: uuid("item_id")
+      .notNull()
+      .references(() => exchangeItems.id, { onDelete: "cascade" }),
+    created_at: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.user_id, t.item_id] }),
+    // Reverse index for "what items has user X saved?" — composite PK already
+    // covers the (user_id, item_id) lookup; this one supports listing.
+    index("exchange_item_saves_user_id_idx").on(t.user_id, t.created_at),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type ExchangeItemRow = typeof exchangeItems.$inferSelect;
 export type NewExchangeItemRow = typeof exchangeItems.$inferInsert;
+export type ExchangeItemSaveRow = typeof exchangeItemSaves.$inferSelect;
+export type NewExchangeItemSaveRow = typeof exchangeItemSaves.$inferInsert;
 
 // Re-export sql for callers that want to reach for it from one place.
 export { sql };

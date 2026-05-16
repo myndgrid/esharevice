@@ -1000,6 +1000,10 @@ These are isolated, reversible, low-risk fixes that don't require the new stack:
 
 ## Progress Log
 
+### 2026-05-16 06:00 UTC — Soft-delete listings closes the lifecycle end-to-end
+
+`DELETE /v1/exchange-items/{id}` ships as a soft delete — new `archived_at` column on `exchange_items` flipped to `now()` instead of dropping the row. Every API read across `exchange-items.ts` + `saves.ts` gets a `WHERE archived_at IS NULL` filter; the migration's partial index keeps the active-only reads cheap as the archived tail grows. Idempotent at SQL + middleware + action layers. Web side: DeleteButton with inline two-step confirmation (accessibility-friendly, on-brand) in a "Danger zone" section on `/items/[id]/edit`. Full doc: [docs/features/2026-05-16_delete-archive-item.md](../docs/features/2026-05-16_delete-archive-item.md). The listing lifecycle is now complete: create → view → edit → reserve → save → delete.
+
 ### 2026-05-16 05:30 UTC — Edit-item slice closes the listing-lifecycle loop
 
 `PUT /v1/exchange-items/{id}` lands as a partial-update endpoint (only keys present in the body get written — empty form fields are not interpreted as "clear this"). Owner-only at both layers (page redirect + API 403). New `/items/[id]/edit` server component fetches `/v1/me` + the item in parallel, redirects non-owners, renders a pre-filled form with the existing image as preview. Server action shares an idempotency key across the API PUT + the optional image upload (`<key>` / `<key>-image`). Same Blob-rebuild + parseBody pipeline from create. Detail page now shows an Edit button to the owner. Full doc: [docs/features/2026-05-16_edit-item.md](../docs/features/2026-05-16_edit-item.md).

@@ -326,3 +326,17 @@ Closes the listing-lifecycle loop (create → view → edit → reserve).
 - **Images:** `ghcr.io/myndgrid/esharevice-api:205a419` (digest `sha256:790cc564385fa13a20f6c52e1319d6b1ef89fdef8897fb1273da815519617980`); `ghcr.io/myndgrid/esharevice-web:205a419` (digest `sha256:6ff4b7fdbc93218e74544ab072bff8a880814fa63c99776e33072439c92d7ae1`).
 - **Roll:** parallel buildx + push; `docker compose up -d --force-recreate api web`. Both healthy in <12 s.
 - **Live verification:** `/v1/health` 200; unauth `PUT /v1/exchange-items/<id>` → 401; anon `/items/<id>/edit` → 307 to login; OpenAPI shows `get + put` on `/v1/exchange-items/{id}`.
+
+### 2026-05-16 06:00 UTC — Soft-delete (archive) listings
+
+Closes the listing-lifecycle loop. Owners can delete their listings; the row stays in DB with `archived_at` set, every API read filters it out, FK referrers (saves + reserved_by) keep their referential integrity.
+
+- **Commits:** `48923c7 feat(db): exchange_items.archived_at` + `ba25c47 feat(api): DELETE /v1/exchange-items/{id} + archived filter on every read` + `9152ece feat(web): delete listing — DeleteButton + danger zone`.
+- **Migration:** `packages/db/drizzle/0002_0001_exchange_items_archived_at.sql` applied to live `esharevice-postgres-1`. Adds nullable `archived_at timestamptz` + partial index `exchange_items_active_idx` covering `(created_at DESC, id DESC) WHERE archived_at IS NULL`.
+- **Images:** `ghcr.io/myndgrid/esharevice-api:9152ece` (digest `sha256:8c91d8b95d944d9ca7186864da96fc6c1a0bbd24176446066b1dfe8563d00ded`); `ghcr.io/myndgrid/esharevice-web:9152ece` (digest `sha256:c4017ae547fbaf0fa475e7b6d418dbce0ea0f45e915063d69d82baa718ca1c64`).
+- **Roll:** `docker compose up -d --force-recreate api web`. Both healthy in <12 s.
+- **Live verification (all green):**
+  - `/v1/health` 200; unauth `DELETE /v1/exchange-items/<id>` → 401; anon `/items/<id>/edit` → 307.
+  - OpenAPI now shows `delete + get + put` on `/v1/exchange-items/{id}`.
+- **Reads filtered.** `WHERE archived_at IS NULL` threaded through every list/get/update path on both `exchange-items.ts` and `saves.ts`. The saves listing's join condition also filters archived rows out so a user who saved an item that the owner later archived stops seeing it on `/saved`.
+- **No new bug-registry entries.** Slice was clean.

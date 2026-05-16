@@ -1000,6 +1000,14 @@ These are isolated, reversible, low-risk fixes that don't require the new stack:
 
 ## Progress Log
 
+### 2026-05-16 05:30 UTC — Edit-item slice closes the listing-lifecycle loop
+
+`PUT /v1/exchange-items/{id}` lands as a partial-update endpoint (only keys present in the body get written — empty form fields are not interpreted as "clear this"). Owner-only at both layers (page redirect + API 403). New `/items/[id]/edit` server component fetches `/v1/me` + the item in parallel, redirects non-owners, renders a pre-filled form with the existing image as preview. Server action shares an idempotency key across the API PUT + the optional image upload (`<key>` / `<key>-image`). Same Blob-rebuild + parseBody pipeline from create. Detail page now shows an Edit button to the owner. Full doc: [docs/features/2026-05-16_edit-item.md](../docs/features/2026-05-16_edit-item.md).
+
+### 2026-05-16 05:00 UTC — Google OAuth activated + bug-registry +1
+
+Social OAuth scaffolding activated for Google (GitHub deferred — template stays as reference). Secrets pushed to VPS via `scp` + python merge; no value ever on a command line. Authentik admin API confirms `slug=google, enabled=True, blueprint status=successful`. Discovered + fixed a follow-up gotcha: Authentik's `default-authentication-identification` stage has an explicit `sources: ManyToMany` field that's empty by default — the OAuthSource record alone doesn't render a button on the login screen. PATCH'd live + codified in the blueprint. Bug-registry entry `[Build] Authentik OAuth Source Doesn't Auto-Attach to the Login Screen` added (counter 42 → 43).
+
 ### 2026-05-16 04:35 UTC — Observability + social OAuth scaffolding
 
 Sentry SDK init lands on both api (`@sentry/node`) and web (`@sentry/nextjs`). API instruments BEFORE any other import so HTTP/Postgres patches install correctly; onError reports 5xx + unexpected errors via `captureException` (4xx skipped to avoid flooding). Web uses Next 15's `register()` hook with `NEXT_RUNTIME`-aware init. Both env-gated on `SENTRY_DSN` so local + CI no-op. Verified live: both 95-char DSNs reach the production containers.

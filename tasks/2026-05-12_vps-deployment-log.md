@@ -311,3 +311,18 @@ User opted for Google only on initial activation. Live blueprint `infra/authenti
   - `GET /api/v3/managed/blueprints/` → `e-Sharevice social OAuth sources | status: successful | path: custom/social.yaml | last_applied: 2026-05-16T04:50:08Z`.
   - `GET /source/oauth/login/google/` → 302 → `accounts.google.com/o/oauth2/auth?client_id=1006...&redirect_uri=https://auth.esharevice.com/source/oauth/callback/google/&...` (end-to-end Google flow reachable).
 - **Browser smoke pending the user.** Login screen renders the "Sign in with Google" button via the Authentik SPA — only visible to a real browser, not curl. Visit `https://auth.esharevice.com` in incognito to confirm.
+
+### 2026-05-16 05:00 UTC — Google source attached to the login screen
+
+User reported the "Sign in with Google" button wasn't appearing. Root cause: Authentik's `default-authentication-identification` stage has an explicit `sources: ManyToMany` field that's empty by default — having an OAuthSource record alone doesn't put it on the login screen. Fix: PATCH'd the stage live (added google source UUID + set `show_source_labels: true`) and codified the same change in [infra/authentik/blueprints/social.yaml](../infra/authentik/blueprints/social.yaml) so it survives future blueprint reapplies. New bug-registry entry `[Build] Authentik OAuth Source Doesn't Auto-Attach to the Login Screen` (counter 42 → 43). Commit `ab68589`.
+
+### 2026-05-16 05:30 UTC — Edit-item slice
+
+Closes the listing-lifecycle loop (create → view → edit → reserve).
+
+- **Commits:** `8282736 feat(api): PUT /v1/exchange-items/{id}` + `205a419 feat(web): /items/[id]/edit`.
+- **API:** new owner-only PUT endpoint. Partial update — only keys actually present in the body are written. Pre-read for ownership check (403 with useful message), idempotency middleware applied. OpenAPI spec now advertises GET + PUT on the same path.
+- **Web:** `/items/[id]/edit` server component with auth + owner gates. Pre-filled form using the row's current values; optional image replacement using the existing upload pipeline (same Buffer/Blob/parseBody pattern from create). Server action's idempotency key derives the image-upload key as `<key>-image` so both calls in the same submit can replay independently.
+- **Images:** `ghcr.io/myndgrid/esharevice-api:205a419` (digest `sha256:790cc564385fa13a20f6c52e1319d6b1ef89fdef8897fb1273da815519617980`); `ghcr.io/myndgrid/esharevice-web:205a419` (digest `sha256:6ff4b7fdbc93218e74544ab072bff8a880814fa63c99776e33072439c92d7ae1`).
+- **Roll:** parallel buildx + push; `docker compose up -d --force-recreate api web`. Both healthy in <12 s.
+- **Live verification:** `/v1/health` 200; unauth `PUT /v1/exchange-items/<id>` → 401; anon `/items/<id>/edit` → 307 to login; OpenAPI shows `get + put` on `/v1/exchange-items/{id}`.

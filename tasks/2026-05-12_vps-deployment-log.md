@@ -1,7 +1,7 @@
 # VPS Deployment Log — e-Sharevice (esharevice.com on Hostinger)
 
 **Created:** 2026-05-12 22:00 UTC
-**Last Updated:** 2026-05-16 15:19 UTC
+**Last Updated:** 2026-05-16 15:45 UTC
 **Status:** Stack live; Authentik fully provisioned; typed Hono /v1 API serving real routes
 
 The runbook's prerequisites were sourced from `tasks/.env.creds` (gitignored). The user opted for the "fast path" (option B in the kickoff exchange): use the master credentials once for setup, rotate after. **All four credentials below MUST be rotated** before this is treated as production.
@@ -464,3 +464,13 @@ Production `https://esharevice.com/` mobile audit went from 86 / 92 / 96 / 100 t
 - **Images:** API `ghcr.io/myndgrid/esharevice-api:bb7640b` (`sha256:f3d678a8…`), web `ghcr.io/myndgrid/esharevice-web:bb7640b` (`sha256:91242d63…`). Both built with `--no-cache-filter check`.
 - **Deploy:** API rolled first (force-recreate api), then web after web build finished — Zod-validation contract requires the API response to include `unread_count` before the new web bundle starts parsing responses. Brief overlap of old web hitting new API was safe (Zod strips the unknown field).
 - **Verification:** both image digests on running containers match the pushed manifests exactly. `/v1/health` 200, `/` 200, `/messages` 307 (auth redirect — correct for unauthed curl). No new Sentry issues.
+
+### 2026-05-16 15:45 UTC — Email preferences + unsubscribe footer
+
+- **What shipped:** every transactional email now carries an unsubscribe footer (text + HTML) and a `List-Unsubscribe` header; each send path gates on a per-category `users.email_<category>_enabled` boolean; the link target is `/unsubscribe?token=…&c=…` on the web (renders a confirm page on GET, server action POSTs `/v1/email/unsubscribe` to flip the column). Signed-in users can manage all three categories from `/settings/notifications`. Full design + bug-registry notes in [docs/features/2026-05-16_email-preferences.md](../docs/features/2026-05-16_email-preferences.md).
+- **Migration:** `0005_0001_user_email_prefs.sql` adds `email_token uuid NOT NULL DEFAULT gen_random_uuid()` + three booleans (all default `true`) to `users` + a unique index on `email_token`. Backfill is via the DEFAULT clauses so existing rows are immediately covered. Applied to live Postgres via `docker exec -i esharevice-postgres-1 psql -U esharevice -d esharevice < …`; verified columns present.
+- **Helper refactor:** all four send helpers (`sendReservedEmail`, `sendItemReservedEmailToSaver`, `sendItemArchivedEmailToSaver`, `sendNewMessageEmail`) now take `recipientId` and do their own user lookup. Centralises the email + name + prefs + token resolution in one place. `getSaversToNotify` return shape narrowed to `{ user_id }[]` (only consumer was the saver-fan-out loop).
+- **Endpoints (new):** `GET /v1/me/email-prefs` (auth), `PATCH /v1/me/email-prefs` (auth, partial body), `POST /v1/email/unsubscribe` (public, token-authed). Static path `/v1/email/unsubscribe` mounted via a new route module to keep it visibly distinct from the rest of `/v1/me/*`.
+- **Images:** API `ghcr.io/myndgrid/esharevice-api:1ac0572` (`sha256:5f70019a…`), web `ghcr.io/myndgrid/esharevice-web:1ac0572` (`sha256:6085728f…`). Both built with `--no-cache-filter check`; real layer pushes (4.6 s + 35 s).
+- **Deploy order:** migration → API rolled first (the new endpoints + helper signature change need to be live before any new web bundle calls them) → web rolled after web build finished. Brief window of old web hitting new API was safe — old web doesn't call the new endpoints, doesn't observe the helper signature.
+- **Verification:** image digests on running containers match pushed manifests exactly. `/v1/health` 200, `GET /v1/me/email-prefs` 401 unauth (auth gate working), `POST /v1/email/unsubscribe` w/ unknown token 404 (token gate working), `/settings/notifications` 307 unauth (auth redirect), `/unsubscribe?token=<uuid>&c=new_message` 200 (renders "Confirm unsubscribe" card), `/unsubscribe?token=nope&c=new_message` 200 (renders "Invalid unsubscribe link" card). No new Sentry issues.

@@ -1,7 +1,7 @@
 # Task: TypeScript Migration & Frontend Redesign Plan
 
 **Created:** 2026-05-11 00:00 UTC
-**Last Updated:** 2026-05-16 15:19 UTC
+**Last Updated:** 2026-05-16 15:45 UTC
 **Status:** v3.4 — weeks 1-3 shipped + first web slice live (OIDC login + design system + home/profile pages)
 
 ---
@@ -999,6 +999,10 @@ These are isolated, reversible, low-risk fixes that don't require the new stack:
 ---
 
 ## Progress Log
+
+### 2026-05-16 15:45 UTC — Email preferences + unsubscribe footer
+
+Closes the compliance-adjacent loop on the three transactional-email paths. Migration 0005 adds an opaque `email_token` UUID + three boolean preference columns to `users` (default `true` so today's behaviour is preserved). All four send helpers refactored to take `recipientId` and do their own user lookup — centralises email + name + prefs + token resolution. Helper-side gate skips the send when the per-category column is `false`; every email now carries a text + HTML unsubscribe footer plus a `List-Unsubscribe` header. Three new endpoints (`GET`/`PATCH /v1/me/email-prefs`, public `POST /v1/email/unsubscribe`); two new web pages (`/unsubscribe` public confirm + `/settings/notifications` signed-in toggles). Confirm-on-GET-then-POST pattern prevents link previews / security scanners from accidentally unsubscribing users. Full feature doc: [docs/features/2026-05-16_email-preferences.md](../docs/features/2026-05-16_email-preferences.md). Deployed as `1ac0572`; API + web images both rebuilt with `--no-cache-filter check`; migration applied to live Postgres; full verification matrix in the deploy log entry.
 
 ### 2026-05-16 15:19 UTC — Messages Phase B-4: per-conversation unread badges
 

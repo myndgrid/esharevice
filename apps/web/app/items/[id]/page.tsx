@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Button, Card, CardContent } from "@esharevice/ui";
 import { api, ApiError } from "../../../lib/api";
+import { auth } from "../../../lib/auth";
+import { ReserveButton } from "./reserve-button";
 
 export const dynamic = "force-dynamic";
 
@@ -14,13 +16,25 @@ export default async function ItemDetailPage({ params, searchParams }: Props): P
   const { id } = await params;
   const { image_error } = await searchParams;
 
-  let item;
-  try {
-    item = await api.getExchangeItem(id);
-  } catch (err) {
+  // Fetch the item + (if authenticated) the viewer's profile in parallel so
+  // we can detect ownership without serial round-trips. /v1/me only runs
+  // when a session is present; anonymous viewers skip the auth round-trip.
+  const session = await auth();
+  const [itemResult, meResult] = await Promise.all([
+    api.getExchangeItem(id).catch((err) => ({ __error: err as unknown })),
+    session?.access_token
+      ? api.me().catch(() => null)
+      : Promise.resolve(null),
+  ]);
+
+  if ("__error" in itemResult) {
+    const err = itemResult.__error;
     if (err instanceof ApiError && err.status === 404) notFound();
     throw err;
   }
+  const item = itemResult;
+  const me = meResult;
+  const isOwner = Boolean(me && me.id === item.user_id);
 
   // The API returns `img_url` pointing at the 800w variant. The pattern is
   // `<base>/<hash>/<width>.webp` — swap the trailing `/800.webp` for `/1600.webp`
@@ -71,10 +85,21 @@ export default async function ItemDetailPage({ params, searchParams }: Props): P
             <Link href="/">
               <Button variant="secondary" size="sm">Back</Button>
             </Link>
+            {!session && (
+              <Link href={`/api/auth/login?return_to=${encodeURIComponent(`/items/${item.id}`)}`} prefetch={false}>
+                <Button variant="primary" size="sm">Sign in to reserve</Button>
+              </Link>
+            )}
+            {session && isOwner && (
+              <span className="text-xs text-fg-subtle">You posted this item.</span>
+            )}
+            {session && !isOwner && !item.reserved && <ReserveButton itemId={item.id} />}
+            {session && !isOwner && item.reserved && (
+              <span className="text-xs text-fg-muted">
+                {me && item.reserved_by === me.id ? "You reserved this." : "Already reserved."}
+              </span>
+            )}
           </div>
-          {/* Reserve action lands in a follow-up slice — needs a server-action
-              wrapper around api.reserveExchangeItem + owner-self-detection
-              (via /v1/me + comparing item.user_id), neither of which exists yet. */}
         </CardContent>
       </Card>
     </main>

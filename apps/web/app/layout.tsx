@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { Suspense } from "react";
 import { Header } from "../components/header";
+import { MobileTabBar } from "../components/mobile-tab-bar";
 import "./globals.css";
 
 // Force dynamic rendering site-wide. The auth-aware <Header> reads cookies()
@@ -48,11 +49,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeBootstrap }} />
       </head>
-      <body className="bg-bg text-fg">
+      <body className="bg-bg text-fg pb-[calc(3.5rem+env(safe-area-inset-bottom))] md:pb-0">
         <Suspense fallback={<HeaderSkeleton />}>
           <Header />
         </Suspense>
         {children}
+        <MobileTabBar />
       </body>
     </html>
   );

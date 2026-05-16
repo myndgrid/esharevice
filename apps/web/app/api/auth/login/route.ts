@@ -19,6 +19,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   // Where to send the user after login (?return_to=/profile etc.)
   const return_to = req.nextUrl.searchParams.get("return_to") ?? "/";
 
+  // `?signup=1` is a soft hint that the user clicked "Sign up" rather than
+  // "Sign in". Authentik's authorize endpoint supports the OIDC standard
+  // `prompt=create` parameter to signal the IdP to land on the registration
+  // screen rather than the login screen. If Authentik doesn't honour it on a
+  // given deployment, the user still sees a normal login page with a visible
+  // "Need an account? Sign up" link — same end state, one extra click.
+  const signup = req.nextUrl.searchParams.get("signup") === "1";
+
   const authUrl = new URL(as.authorization_endpoint!);
   authUrl.searchParams.set("client_id", client.client_id);
   authUrl.searchParams.set("redirect_uri", getEnv().OIDC_REDIRECT_URI);
@@ -28,6 +36,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   authUrl.searchParams.set("code_challenge_method", "S256");
   authUrl.searchParams.set("state", state);
   authUrl.searchParams.set("nonce", nonce);
+  if (signup) {
+    authUrl.searchParams.set("prompt", "create");
+  }
 
   // Cookies set via `cookies()` from "next/headers" do NOT propagate to a
   // manually-returned NextResponse in Next 15. Build the redirect first, then

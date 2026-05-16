@@ -28,9 +28,14 @@ export async function Header(): Promise<React.ReactElement> {
               </Link>
             </>
           ) : (
-            <Link href="/api/auth/login?return_to=/" prefetch={false}>
-              <Button variant="primary" size="sm">Sign in</Button>
-            </Link>
+            <>
+              <Link href="/api/auth/login?return_to=/&signup=1" prefetch={false}>
+                <Button variant="secondary" size="sm">Sign up</Button>
+              </Link>
+              <Link href="/api/auth/login?return_to=/" prefetch={false}>
+                <Button variant="primary" size="sm">Sign in</Button>
+              </Link>
+            </>
           )}
         </nav>
       </div>

@@ -366,3 +366,18 @@ Builds on the prior email slice. Now: anyone who bookmarked an item gets notifie
   - Archive fan-out excludes `[ownerId]` — they're the actor.
   - A re-DELETE on an already-archived listing is a no-op + skips the savers notification entirely (no re-spam).
 - **No new bug-registry entries.** Slice was clean — no surprises around Resend, the DB queries, or fan-out timing.
+
+### 2026-05-16 07:30 UTC — Messages feature (phase A, polling)
+
+The last big-ticket product feature lands. Non-owner taps "Message owner" on any item, gets a thread with the owner, both parties chat from `/messages/[id]`. Phase A = REST + 5 s client poll; SSE upgrade + email-on-new-message deferred to phase B.
+
+- **Commit:** `3c2b7f8 feat(api): conversations + messages (week-6 phase A)` + the web slice in the same chain (a90a8a2 sequence). CI green (`25955059347`).
+- **Migration:** `packages/db/drizzle/0003_0001_conversations_and_messages.sql` applied to prod via `docker exec -i psql < …`. Two new tables (`conversations`, `messages`) + supporting indexes. `\dt` on prod confirms.
+- **Images:** `ghcr.io/myndgrid/esharevice-api:3c2b7f8` (digest `sha256:50e89756c355a343e5af61fc00ba58e0a6412623d3691d491c49e6804cca2b49`); `ghcr.io/myndgrid/esharevice-web:3c2b7f8` (digest `sha256:55655b51e3daee2ec1867c8ec84dfd01262dc5fa4e8536ace3c1c46b262eaf56`).
+- **Roll:** parallel buildx + push; `docker compose up -d --force-recreate api web`. Both healthy in <12 s.
+- **Live verification:**
+  - `/v1/health` 200.
+  - `GET /v1/conversations` + `POST /v1/exchange-items/<id>/conversations` both 401 unauthed (auth gate fires).
+  - OpenAPI advertises four new paths: `/v1/exchange-items/{id}/conversations`, `/v1/conversations`, `/v1/conversations/{id}`, `/v1/conversations/{id}/messages` (GET + POST).
+  - `/messages` 307 → login when anon; `/messages/<random-uuid>` 307 → login when anon (was 500 mid-development; root cause was a client component pulling `next/headers` via the api client — fixed by introducing server actions for the fetch + send paths).
+- **No new bug-registry entries.** The "client component can't import the auth-aware api client" gotcha is already captured implicitly by Next 15's `next/headers` enforcement; we work around it via server actions, which is the standard pattern.

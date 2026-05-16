@@ -1000,6 +1000,10 @@ These are isolated, reversible, low-risk fixes that don't require the new stack:
 
 ## Progress Log
 
+### 2026-05-16 07:30 UTC — Messages feature shipped (phase A)
+
+The last big-ticket product feature: per-listing conversations between the owner and one prospective party. UNIQUE (item_id, initiator_id) makes thread creation idempotent at the SQL layer; cursor pagination on `(last_message_at desc, id desc)` for the list view and forward `(created_at, id)` for the chat scroll. Web client polls every 5 s with a tail-cursor so idle threads cost an empty page; optimistic-UI send via local tempId with rollback on failure. Server actions wrap `lib/api` for the client component (can't import auth-aware code into the client bundle). Full doc: [docs/features/2026-05-16_messages.md](../docs/features/2026-05-16_messages.md). Phase B (SSE + email-on-new-message) deferred.
+
 ### 2026-05-16 06:30 UTC — CI test runs + transactional email on reserve
 
 CI workflow now runs the full vitest suite against a Postgres service container (typecheck + 11 vitest cases including the reserve-race integration test). Pre-existing broken Lint step commented out with a fix-it-properly note; tracked separately as an ESLint 9 / flat-config migration.

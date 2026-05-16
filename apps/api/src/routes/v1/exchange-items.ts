@@ -15,7 +15,12 @@ import { decodeCursor, encodeCursor } from "../../lib/cursor.js";
 import { imgUrlFromKey } from "../../lib/image-url.js";
 import { env, r2Configured } from "../../env.js";
 import { ALLOWED_MIME_TYPES, MAX_UPLOAD_BYTES, processAndUpload } from "../../lib/sharp-pipeline.js";
-import { sendReservedEmail } from "../../lib/email.js";
+import {
+  sendItemArchivedEmailToSaver,
+  sendItemReservedEmailToSaver,
+  sendReservedEmail,
+} from "../../lib/email.js";
+import { getSaversToNotify, recipientDisplayName } from "../../lib/saves-recipients.js";
 import type { AppEnv } from "../../app.js";
 
 const route = new OpenAPIHono<AppEnv>();
@@ -335,17 +340,32 @@ route.openapi(
         const ownerName =
           `${owner.first_name ?? ""} ${owner.last_name ?? ""}`.trim() || "there";
         const base = env.WEB_PUBLIC_URL ?? env.OIDC_ISSUER.replace(/\/application\/o\/[^/]+\/?$/, "");
+        const itemUrl = `${base.replace(/\/$/, "")}/items/${row.id}`;
         await sendReservedEmail({
           to: owner.email,
           ownerName,
           reserverName,
           itemService: row.service,
-          itemUrl: `${base.replace(/\/$/, "")}/items/${row.id}`,
+          itemUrl,
         });
+
+        // Fan out to everyone else who bookmarked this item — they care that
+        // it just got reserved. Exclude the reserver themselves (they did
+        // the action) and the owner (they got the primary notification just
+        // above; no point double-emailing).
+        const savers = await getSaversToNotify(row.id, [u.id, row.user_id]);
+        for (const s of savers) {
+          await sendItemReservedEmailToSaver({
+            to: s.email,
+            saverName: recipientDisplayName(s),
+            itemService: row.service,
+            itemUrl,
+          });
+        }
       } catch (err) {
-        // sendReservedEmail already swallows, but defensive belt-and-suspenders
-        // for the email-side helper code itself.
-         
+        // The helpers already swallow Resend failures (logged + Sentry-
+        // captured). Belt-and-suspenders for any unexpected throw in the
+        // surrounding setup (DB hiccup on the savers query, etc).
         console.warn("[reserve] notification setup failed:", err);
       }
     })();
@@ -528,13 +548,35 @@ route.openapi(
     if (row.user_id !== u.id) {
       throw new HTTPException(403, { message: "Only the item owner can delete this listing" });
     }
-    // Already archived? Nothing to do — same end state.
+    // Already archived? Nothing to do — same end state. Importantly skip
+    // the savers notification too: we already fired those emails on the
+    // first archive, and a re-DELETE shouldn't spam them again.
     if (row.archived_at) return new Response(null, { status: 204 });
 
     await db
       .update(exchangeItems)
       .set({ archived_at: new Date(), updated_at: new Date() })
       .where(eq(exchangeItems.id, id));
+
+    // Fire-and-forget: notify everyone who bookmarked this item that it's
+    // gone. Exclude the owner (they're the one archiving). Helpers swallow
+    // Resend errors; the outer try/catch covers DB hiccups on the savers
+    // query so they can't bubble out of a void IIFE.
+    void (async () => {
+      try {
+        const savers = await getSaversToNotify(row.id, [u.id]);
+        for (const s of savers) {
+          await sendItemArchivedEmailToSaver({
+            to: s.email,
+            saverName: recipientDisplayName(s),
+            itemService: row.service,
+          });
+        }
+      } catch (err) {
+        console.warn("[delete] saver notification setup failed:", err);
+      }
+    })();
+
     return new Response(null, { status: 204 });
   },
 );

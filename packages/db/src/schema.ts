@@ -38,10 +38,24 @@ export const users = pgTable(
     first_name: text("first_name").notNull(),
     last_name: text("last_name").notNull(),
     postal_code: text("postal_code"),
+    // Opaque token embedded in unsubscribe links — non-enumerable per-user
+    // capability that lets the recipient flip a preference without an
+    // active session. Rotated on demand by the user; never logged.
+    email_token: uuid("email_token").notNull().defaultRandom(),
+    // Per-category transactional-email opt-in. Default true for every
+    // existing row (the 0005 migration backfills); the helpers gate on these
+    // before any Resend send.
+    email_new_message_enabled: boolean("email_new_message_enabled").notNull().default(true),
+    email_reserved_enabled: boolean("email_reserved_enabled").notNull().default(true),
+    email_saved_item_changed_enabled: boolean("email_saved_item_changed_enabled").notNull().default(true),
     created_at: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updated_at: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex("users_oidc_sub_uq").on(t.oidc_sub), uniqueIndex("users_email_uq").on(t.email)],
+  (t) => [
+    uniqueIndex("users_oidc_sub_uq").on(t.oidc_sub),
+    uniqueIndex("users_email_uq").on(t.email),
+    uniqueIndex("users_email_token_uq").on(t.email_token),
+  ],
 );
 
 export const exchangeItems = pgTable(

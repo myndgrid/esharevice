@@ -19,6 +19,7 @@ import me from "./routes/v1/me.js";
 import exchangeItems from "./routes/v1/exchange-items.js";
 import saves from "./routes/v1/saves.js";
 import conversationsRoute from "./routes/v1/conversations.js";
+import emailUnsubscribe from "./routes/v1/email-unsubscribe.js";
 import type { AppEnv } from "./app.js";
 
 const app = new OpenAPIHono<AppEnv>();
@@ -55,6 +56,7 @@ app.route("/v1", me);
 app.route("/v1", exchangeItems);
 app.route("/v1", saves);
 app.route("/v1", conversationsRoute);
+app.route("/v1", emailUnsubscribe);
 
 // ─────────────────────── OpenAPI spec + Swagger UI
 app.doc("/v1/openapi.json", {

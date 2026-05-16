@@ -4,3 +4,4 @@ export * from "./schemas/pagination";
 export * from "./schemas/problem";
 export * from "./schemas/saved";
 export * from "./schemas/messaging";
+export * from "./schemas/email-prefs";

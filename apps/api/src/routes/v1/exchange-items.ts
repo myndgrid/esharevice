@@ -1,7 +1,7 @@
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
-import { getDb, exchangeItems, users, type ExchangeItemRow } from "@esharevice/db";
+import { getDb, exchangeItems, type ExchangeItemRow } from "@esharevice/db";
 import {
   CursorQuery,
   ExchangeItem,
@@ -20,7 +20,7 @@ import {
   sendItemReservedEmailToSaver,
   sendReservedEmail,
 } from "../../lib/email.js";
-import { getSaversToNotify, recipientDisplayName } from "../../lib/saves-recipients.js";
+import { getSaversToNotify } from "../../lib/saves-recipients.js";
 import type { AppEnv } from "../../app.js";
 
 const route = new OpenAPIHono<AppEnv>();
@@ -324,26 +324,12 @@ route.openapi(
     // observed as a 200 by the reserver regardless of email-side state.
     void (async () => {
       try {
-        const ownerRows = await db
-          .select({
-            email: users.email,
-            first_name: users.first_name,
-            last_name: users.last_name,
-          })
-          .from(users)
-          .where(eq(users.id, row.user_id))
-          .limit(1);
-        const owner = ownerRows[0];
-        if (!owner) return;
         const reserverName =
           `${u.first_name ?? ""} ${u.last_name ?? ""}`.trim() || "Someone";
-        const ownerName =
-          `${owner.first_name ?? ""} ${owner.last_name ?? ""}`.trim() || "there";
         const base = env.WEB_PUBLIC_URL ?? env.OIDC_ISSUER.replace(/\/application\/o\/[^/]+\/?$/, "");
         const itemUrl = `${base.replace(/\/$/, "")}/items/${row.id}`;
         await sendReservedEmail({
-          to: owner.email,
-          ownerName,
+          recipientId: row.user_id,
           reserverName,
           itemService: row.service,
           itemUrl,
@@ -356,8 +342,7 @@ route.openapi(
         const savers = await getSaversToNotify(row.id, [u.id, row.user_id]);
         for (const s of savers) {
           await sendItemReservedEmailToSaver({
-            to: s.email,
-            saverName: recipientDisplayName(s),
+            recipientId: s.user_id,
             itemService: row.service,
             itemUrl,
           });
@@ -567,8 +552,7 @@ route.openapi(
         const savers = await getSaversToNotify(row.id, [u.id]);
         for (const s of savers) {
           await sendItemArchivedEmailToSaver({
-            to: s.email,
-            saverName: recipientDisplayName(s),
+            recipientId: s.user_id,
             itemService: row.service,
           });
         }

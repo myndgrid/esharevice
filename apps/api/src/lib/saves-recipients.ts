@@ -2,22 +2,20 @@ import { and, eq, notInArray } from "drizzle-orm";
 import { exchangeItemSaves, getDb, users } from "@esharevice/db";
 
 export type SaverRecipient = {
-  email: string;
-  first_name: string;
-  last_name: string;
+  user_id: string;
 };
 
 /**
- * All users who have bookmarked `itemId`, joined with their profile, with
- * a configurable exclusion list (the reserver and the owner already get
- * dedicated notifications and shouldn't be double-emailed).
+ * All users who have bookmarked `itemId` (minus an exclusion list — the
+ * reserver and the owner already get dedicated notifications and shouldn't
+ * be double-emailed). Returns just the user_ids; the email helpers do
+ * their own lookup so the per-user preference + unsubscribe-token plumbing
+ * lives in one place.
  *
  * The composite PK on `exchange_item_saves(user_id, item_id)` makes this
- * lookup an index range scan; the inner join with `users` is the typical
- * one-row-per-saver cost. No pagination — for an exchange-item listing,
- * the saves count is bounded by the user-base size and realistically
- * stays well under triple digits. If it grows, add a cursor + dispatch
- * to a background queue.
+ * lookup an index range scan; no pagination because the saves count is
+ * bounded by user-base size and stays well under triple digits in practice.
+ * If it grows, add a cursor + dispatch to a background queue.
  */
 export async function getSaversToNotify(
   itemId: string,
@@ -29,18 +27,8 @@ export async function getSaversToNotify(
     conditions.push(notInArray(exchangeItemSaves.user_id, excludeUserIds));
   }
   return db
-    .select({
-      email: users.email,
-      first_name: users.first_name,
-      last_name: users.last_name,
-    })
+    .select({ user_id: users.id })
     .from(exchangeItemSaves)
     .innerJoin(users, eq(exchangeItemSaves.user_id, users.id))
     .where(and(...conditions));
-}
-
-/** Build a friendly display name from a SaverRecipient row, falling back when both name fields are empty. */
-export function recipientDisplayName(r: SaverRecipient): string {
-  const composed = `${r.first_name ?? ""} ${r.last_name ?? ""}`.trim();
-  return composed.length > 0 ? composed : "there";
 }

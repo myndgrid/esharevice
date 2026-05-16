@@ -643,26 +643,12 @@ route.openapi(
           return; // they're actively viewing — SSE delivers it
         }
 
-        const [recipient] = await db
-          .select({
-            email: users.email,
-            first_name: users.first_name,
-            last_name: users.last_name,
-          })
-          .from(users)
-          .where(eq(users.id, recipientId))
-          .limit(1);
-        if (!recipient) return;
-
         const senderName =
           `${u.first_name ?? ""} ${u.last_name ?? ""}`.trim() || "Someone";
-        const recipientName =
-          `${recipient.first_name ?? ""} ${recipient.last_name ?? ""}`.trim() || "there";
         const base =
           env.WEB_PUBLIC_URL ?? env.OIDC_ISSUER.replace(/\/application\/o\/[^/]+\/?$/, "");
         await sendNewMessageEmail({
-          to: recipient.email,
-          recipientName,
+          recipientId,
           senderName,
           itemService: conv.item_service,
           preview: body.body,

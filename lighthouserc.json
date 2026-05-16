@@ -1,7 +1,11 @@
 {
+  "_about": "Auth-gated routes (/items/new, /messages, /settings/*) are intentionally NOT audited here — Lighthouse runs headless without session cookies and would just measure the OIDC redirect. Wiring puppeteerScript + a test user in Authentik + GitHub Actions secrets is a separate follow-up; see docs/features/2026-05-16_lighthouse-ci-public-routes.md. /items/<id> is pinned to a stable production listing; if that listing is deleted, update the URL or rotate to another.",
   "ci": {
     "collect": {
-      "url": ["https://esharevice.com/"],
+      "url": [
+        "https://esharevice.com/",
+        "https://esharevice.com/items/62756a14-5e08-4700-9f4f-1cf9dc14a1bf"
+      ],
       "numberOfRuns": 2,
       "settings": {
         "preset": "desktop",

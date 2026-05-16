@@ -1,7 +1,7 @@
 # VPS Deployment Log — e-Sharevice (esharevice.com on Hostinger)
 
 **Created:** 2026-05-12 22:00 UTC
-**Last Updated:** 2026-05-16 16:57 UTC
+**Last Updated:** 2026-05-16 17:47 UTC
 **Status:** Stack live; Authentik fully provisioned; typed Hono /v1 API serving real routes
 
 The runbook's prerequisites were sourced from `tasks/.env.creds` (gitignored). The user opted for the "fast path" (option B in the kickoff exchange): use the master credentials once for setup, rotate after. **All four credentials below MUST be rotated** before this is treated as production.
@@ -507,3 +507,10 @@ Sentry triage: ESHAREVICE-WEB-3 at 15:14:26 UTC — `ApiError: /v1/conversations
 - **Not in scope:** focus traps. No modals/dialogs exist anywhere in the app yet; nothing to trap focus inside. Revisit when the first modal lands (likely the reservation-cancellation flow or a settings prompt).
 - **Image:** web only — API unchanged. Build/push/deploy details land in this entry once the roll completes.
 - **Verification target:** image digest matches push exactly; home page HTML contains the skip-to-content link + `id="main-content"` target; `aria-label="Exchange listings"` on the home grid `<ul>`; conversation page's textarea has the label association; aria-busy attribute toggles correctly under pending state (manual check).
+
+### 2026-05-16 17:47 UTC — Lighthouse CI: public /items/[id] added; auth-CI parked
+
+- **What shipped:** `lighthouserc.json` now audits the Lorem Ipsum demo listing (`/items/62756a14-5e08-4700-9f4f-1cf9dc14a1bf`) alongside `/`. Same desktop preset, same 0.85/0.95/0.9/0.95 thresholds. Pure CI config; no production deploy.
+- **No-deploy item.** Lighthouse runs in GitHub Actions post-push against the already-live site. Adding URLs doesn't ship anything new to the VPS — it just expands what regressions CI catches on the next push to main.
+- **Auth-CI follow-up (parked).** Tried two approaches to make Lighthouse audit `/items/new` + `/messages` + `/settings/notifications`: (a) Puppeteer clicking the Authentik form — blocked on Lit shadow-DOM rendering with light-DOM decoy inputs at `top: -2000`; (b) flow-executor JSON API — got through identification + password stages cleanly, blocked at consent submission with `ak-stage-flow-error` and only a `request_id`. The `lh-bot` Authentik user is provisioned (pk=8); credentials in `.env.creds`. To unblock: SSH the VPS, `docker logs esharevice-authentik-server-1 | grep <request_id>` to surface the actual server-side exception. Full triage in [docs/features/2026-05-16_lighthouse-ci-public-routes.md](../docs/features/2026-05-16_lighthouse-ci-public-routes.md).
+- **Brittleness call-out:** the original scope estimate flagged this as "brittle (Authentik form selectors can change)" — the warning landed. Defaulting to parking when the second approach hits a wall is the right move; chasing a third would be sunk-cost reasoning.

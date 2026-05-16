@@ -1,7 +1,7 @@
 # Task: TypeScript Migration & Frontend Redesign Plan
 
 **Created:** 2026-05-11 00:00 UTC
-**Last Updated:** 2026-05-16 16:57 UTC
+**Last Updated:** 2026-05-16 17:47 UTC
 **Status:** v3.4 — weeks 1-3 shipped + first web slice live (OIDC login + design system + home/profile pages)
 
 ---
@@ -999,6 +999,12 @@ These are isolated, reversible, low-risk fixes that don't require the new stack:
 ---
 
 ## Progress Log
+
+### 2026-05-16 17:47 UTC — Lighthouse CI: public /items/[id] added; auth-CI parked
+
+Expanded the Lighthouse audit to include the Lorem Ipsum demo listing at `/items/62756a14-5e08-4700-9f4f-1cf9dc14a1bf` alongside `/`. Same desktop preset + 0.85/0.95/0.9/0.95 thresholds. CI config only — runs in GitHub Actions post-push, no production roll.
+
+Auth-CI follow-up attempted + parked. Tried two paths to make Lighthouse audit auth-gated routes: (a) Puppeteer clicking the Authentik UI — blocked on Lit shadow-DOM rendering; (b) Authentik flow-executor JSON API — got through identification + password but hit `ak-stage-flow-error` at consent submission with only a `request_id`. The `lh-bot` Authentik user is provisioned (pk=8); credentials in `.env.creds`. Full triage in [docs/features/2026-05-16_lighthouse-ci-public-routes.md](../docs/features/2026-05-16_lighthouse-ci-public-routes.md). Unblocking needs server-log diagnosis on the consent error — a fresh ~1-2 hour session.
 
 ### 2026-05-16 16:57 UTC — A11y deep pass
 

@@ -250,11 +250,17 @@ route.openapi(
     const otherPartyById = new Map(otherPartyRows.map((r) => [r.id, r]));
 
     // Latest message per conversation (DISTINCT ON pattern in Postgres).
-    // sql.join builds the IN-list as proper parameterised placeholders;
-    // same fix shape as above for the same reason.
-    const previewRows =
+    // sql.join builds the IN-list as proper parameterised placeholders.
+    //
+    // `db.execute(sql\`…\`)` returns the rows DIRECTLY when the driver is
+    // postgres-js (what we use). Earlier code treated the result as a
+    // node-postgres-style `{ rows: [...] }` envelope, so `.rows.map(…)`
+    // threw "Cannot read properties of undefined" once the cast bug was
+    // fixed and the query actually ran. Sentry caught 15 of those before
+    // I noticed.
+    const previewRows: { conversation_id: string; body: string }[] =
       convIds.length > 0
-        ? await db.execute<{ conversation_id: string; body: string }>(sql`
+        ? ((await db.execute<{ conversation_id: string; body: string }>(sql`
             SELECT DISTINCT ON ("conversation_id") "conversation_id", "body"
             FROM ${messages}
             WHERE "conversation_id" IN (${sql.join(
@@ -262,13 +268,10 @@ route.openapi(
               sql`, `,
             )})
             ORDER BY "conversation_id", "created_at" DESC, "id" DESC
-          `)
-        : { rows: [] };
+          `)) as unknown as { conversation_id: string; body: string }[])
+        : [];
     const previewByConv = new Map(
-      (previewRows as { rows: { conversation_id: string; body: string }[] }).rows.map((r) => [
-        r.conversation_id,
-        r.body,
-      ]),
+      previewRows.map((r) => [r.conversation_id, r.body]),
     );
 
     const items = page.map((r) => {

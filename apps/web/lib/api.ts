@@ -1,6 +1,7 @@
 import {
   Conversation,
   cursorPage,
+  EmailPrefs,
   ExchangeItem,
   ExchangeItemCreate,
   ExchangeItemUpdate,
@@ -10,6 +11,7 @@ import {
   UnreadCount,
   UserPublic,
 } from "@esharevice/shared";
+import type { EmailPrefsUpdate } from "@esharevice/shared";
 import { z } from "zod";
 import { auth } from "./auth";
 
@@ -39,7 +41,7 @@ export class ApiError extends Error {
 }
 
 type Options = {
-  method?: "GET" | "POST" | "PUT" | "DELETE";
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
   /** Pre-built FormData body — bypasses JSON serialisation; sets no content-type so the browser/runtime picks the multipart boundary. */
   formBody?: FormData;
@@ -121,6 +123,29 @@ async function call<T>(path: string, schema: z.ZodType<T>, opts: Options = {}): 
 
 export const api = {
   me: () => call("/v1/me", UserPublic, { authed: true, revalidate: false }),
+
+  getEmailPrefs: () =>
+    call("/v1/me/email-prefs", EmailPrefs, { authed: true, revalidate: false }),
+
+  updateEmailPrefs: (body: EmailPrefsUpdate) =>
+    call("/v1/me/email-prefs", EmailPrefs, {
+      method: "PATCH",
+      body,
+      authed: true,
+      revalidate: false,
+    }),
+
+  /**
+   * Public unsubscribe — no auth, the token IS the capability. Returns
+   * void on success; throws ApiError on a stale/invalid token.
+   */
+  unsubscribeEmail: (token: string, category: string) =>
+    call("/v1/email/unsubscribe", z.void(), {
+      method: "POST",
+      body: { token, category },
+      authed: false,
+      revalidate: false,
+    }),
 
   listExchangeItems: (opts: { cursor?: string; limit?: number; q?: string } = {}) => {
     const params = new URLSearchParams();

@@ -3,7 +3,7 @@
 A community skill / item exchange app — TypeScript monorepo. Self-hosted at [esharevice.com](https://esharevice.com).
 
 **Created:** 2026-05-12 02:00 UTC
-**Last Updated:** 2026-05-15 23:55 UTC
+**Last Updated:** 2026-05-16 22:35 UTC
 **Status:** Weeks 1 + 2 + 3 shipped. Production stack live; typed `/v1` API serving; redesigned web frontend in progress.
 
 ---
@@ -139,6 +139,7 @@ For full OIDC login to work locally, see [tasks/2026-05-12_vps-provisioning-runb
 
 | Doc | Purpose |
 |---|---|
+| [docs/PROJECT_INDEX.md](docs/PROJECT_INDEX.md) | Navigable catalog of every feature doc, ops runbook, task log, and key code path — start here when you don't know which doc owns a topic |
 | [tasks/2026-05-11_typescript-migration-and-redesign-plan.md](tasks/2026-05-11_typescript-migration-and-redesign-plan.md) | Master plan + week-by-week roadmap + decision log (current: **v3.4**) |
 | [tasks/2026-05-12_vps-provisioning-runbook.md](tasks/2026-05-12_vps-provisioning-runbook.md) | 12-step runbook for provisioning a fresh VPS (re-creatable from scratch) |
 | [tasks/2026-05-12_vps-deployment-log.md](tasks/2026-05-12_vps-deployment-log.md) | What's actually deployed on the live box, bug-by-bug |

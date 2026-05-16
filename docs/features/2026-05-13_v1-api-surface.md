@@ -1,8 +1,8 @@
 # Feature: /v1 API surface
 
 **Created:** 2026-05-13 00:30 UTC
-**Last Updated:** 2026-05-13 01:00 UTC
-**Status:** Stable (foundational routes shipped — feature routes accrete on top)
+**Last Updated:** 2026-05-16 02:20 UTC
+**Status:** Stable. Week-3 foundational routes + week-4 upload pipeline + idempotency middleware are live.
 
 The first slice of the public API. Auth, error shape, pagination, and FTS are all decided here; later feature routes inherit these primitives.
 
@@ -27,10 +27,42 @@ The API is intentionally a **product**, not an internal implementation detail. T
 | GET | `/v1/me` | Bearer | Authenticated user's `UserPublic` row |
 | GET | `/v1/exchange-items` | optional | List of items, cursor-paginated; `?q=` runs Postgres FTS |
 | GET | `/v1/exchange-items/{id}` | optional | Single item by UUID; 404 if missing |
-| POST | `/v1/exchange-items` | Bearer | Create an item owned by the authenticated user |
-| PUT | `/v1/exchange-items/{id}/reserve` | Bearer | Reserve an item; 409 on own-item or already-reserved-by-another |
+| POST | `/v1/exchange-items` | Bearer + Idempotency | Create an item owned by the authenticated user |
+| PUT | `/v1/exchange-items/{id}/reserve` | Bearer + Idempotency | Reserve an item; 409 on own-item or already-reserved-by-another |
+| POST | `/v1/exchange-items/{id}/image` | Bearer + owner + Idempotency | Upload + process the item's image. Multipart `image` field; server resizes to 1600/800/400 .webp variants on Cloudflare R2 |
 
 `optional` auth means the route works without a token, but if a valid token is present the user is attached to the request context (useful for personalised responses later — e.g. hiding the user's own items from the list).
+
+### Idempotency
+
+Every unsafe route accepts an optional `Idempotency-Key` header. Recommended pattern: generate a UUID v4 client-side at the point the user clicks the button; reuse it on every network retry of that *same logical operation*. Stripe-flavoured semantics:
+
+- First call with key `K` runs the handler. Response is cached in Redis at `idem:{sub}:{K}` for 24 h. Only 2xx responses are cached.
+- Retry with the same `K` and same body → server returns the cached `{status, body}` byte-for-byte, never reruns the handler. Response carries an `idempotency-replay: true` header so clients can distinguish.
+- Retry with the same `K` but a *different* body → `409 Conflict`. A client reusing a key for a distinct operation is a bug; silent replay would corrupt state.
+- Key length cap: 255 chars.
+
+The header is optional today — endpoints work without it for one-shot calls. The image upload endpoint uses `processAndUpload`'s content-hashed keys for natural dedup at the storage layer, and idempotency is layered on top so retried requests skip the sharp resize entirely.
+
+### Image upload
+
+`POST /v1/exchange-items/{id}/image`
+
+- Body: `multipart/form-data`, single field `image`.
+- Allowed MIME: `image/jpeg`, `image/png`, `image/webp`.
+- Hard size limit: 10 MB (pre-checked via `Content-Length`, re-checked post-buffer).
+- Only the item's owner may upload (403 otherwise).
+- Returns `503` if R2 isn't configured (env-gated) — the rest of the API stays usable.
+
+Server pipeline:
+
+1. sha256 the raw upload — also the R2 key prefix (`<hash>/`).
+2. sharp: `rotate()` (apply EXIF) → `resize({ width, withoutEnlargement: true })` → `webp({ quality: 82 })` per variant width.
+3. Variant widths: **1600** (full / lightbox), **800** (card — `img_url` default), **400** (thumbnail / message previews).
+4. PutObject to R2 at `<hash>/<width>.webp` with `Cache-Control: public, max-age=31536000, immutable`. Skipped if the key already exists (dedup).
+5. Update `exchange_items.img_key` + `img_hash` to the new sha256.
+
+**URL convention.** The `img_url` field on the row response points at the **800w** variant. Clients can swap `/800.webp` for `/1600.webp` or `/400.webp` to opt into other widths — the pattern is stable. A future change may expose explicit variant URLs as an object in the schema.
 
 ---
 
@@ -45,10 +77,15 @@ The API is intentionally a **product**, not an internal implementation detail. T
 | Errors | `apps/api/src/middleware/error.ts` | `onError` + `notFound` produce `application/problem+json` |
 | User lookup | `apps/api/src/lib/users.ts` | `resolveUserFromSub` — lazy provisioning with onConflictDoUpdate race-handling |
 | Cursor | `apps/api/src/lib/cursor.ts` | Base64-encoded `(ts, id)` tuple — opaque to clients |
-| Image URL | `apps/api/src/lib/image-url.ts` | R2 key → public CDN URL (stub until week 4) |
+| Image URL | `apps/api/src/lib/image-url.ts` | `imgUrlFromKey` (default 800w) + `imgUrlVariant` + the `IMAGE_VARIANTS` array |
+| R2 client | `apps/api/src/lib/r2.ts` | Lazy `S3Client` for Cloudflare R2 (region `auto`, endpoint `<account>.r2.cloudflarestorage.com`); `putObject` + `objectExists` |
+| sharp pipeline | `apps/api/src/lib/sharp-pipeline.ts` | Decode → autoOrient → resize-to-each-variant → webp encode → R2 PUT. sha256-keyed dedup; 10 MB cap; jpeg/png/webp allowlist |
+| Redis client | `apps/api/src/lib/redis.ts` | Lazy ioredis singleton with bounded retry backoff |
+| Idempotency | `apps/api/src/middleware/idempotency.ts` | Per-user-scoped, fingerprinted, 24 h TTL, replays 2xx only |
 | Routes | `apps/api/src/routes/v1/me.ts`, `apps/api/src/routes/v1/exchange-items.ts` | Per-route handlers, defined with `createRoute()` |
 | Schemas | `packages/shared/src/schemas/*.ts` | `UserPublic`, `ExchangeItem`, `ExchangeItemCreate`, `CursorQuery`, `cursorPage`, `Problem` |
-| DB | `packages/db/src/schema.ts` | `users`, `exchangeItems` Drizzle tables |
+| DB | `packages/db/src/schema.ts` | `users`, `exchangeItems` Drizzle tables (`img_key` + `img_hash` columns already provisioned in the 0000 migration) |
+| Tests | `apps/api/tests/sharp-pipeline.test.ts`, `apps/api/tests/idempotency.test.ts` | Vitest unit + integration, R2 + Redis mocked. 10 tests, runs in <1 s. |
 
 ---
 

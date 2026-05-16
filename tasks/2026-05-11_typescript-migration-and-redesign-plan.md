@@ -1000,6 +1000,10 @@ These are isolated, reversible, low-risk fixes that don't require the new stack:
 
 ## Progress Log
 
+### 2026-05-16 02:20 UTC — Week 4 backend foundation (R2 + idempotency)
+
+The backend half of the image upload pipeline + the long-pending idempotency middleware. `POST /v1/exchange-items/:id/image` accepts multipart, content-hashes the upload, runs sharp through three webp variants (1600 / 800 / 400 widths), uploads to a content-keyed prefix on Cloudflare R2, updates the row's `img_key`. Idempotency middleware (Stripe-flavoured, Redis-backed, 24 h TTL, fingerprints body to detect key-reuse-with-different-payload) wired across every unsafe `/v1/exchange-items` route. 10 vitest tests green (R2 + Redis mocked). Bucket provisioned via the Cloudflare REST API; S3 access keys + `cdn.esharevice.com` custom domain remain as a ~2-minute Cloudflare dashboard step (the public API doesn't expose either of those — captured in the bug-registry). Until that's done the upload endpoint returns 503; the rest of the API is unaffected. Full detail in [tasks/2026-05-16_week-4-r2-image-upload-and-idempotency.md](2026-05-16_week-4-r2-image-upload-and-idempotency.md).
+
 ### 2026-05-16 01:52 UTC — Root-domain cutover
 
 The live web app moves from `https://app.esharevice.com` to `https://esharevice.com`. The legacy `app.*` and `www.*` hostnames 301-redirect to root (cert stays provisioned so the redirect itself completes cleanly). Authentik's `e-sharevice-web` provider was updated additively first (new URI added alongside the old) to avoid a redirect-uri-mismatch lockout; Caddy + compose env then flipped. Full detail and a new bug-registry entry (`[Build] Docker Single-File Bind Mount Pins to Inode — git pull Silently Breaks It`) are in [tasks/2026-05-16_root-domain-cutover.md](2026-05-16_root-domain-cutover.md). README, both feature docs, and the VPS deployment log are in sync with the new URL.

@@ -1,7 +1,7 @@
 # VPS Deployment Log — e-Sharevice (esharevice.com on Hostinger)
 
 **Created:** 2026-05-12 22:00 UTC
-**Last Updated:** 2026-05-16 16:00 UTC
+**Last Updated:** 2026-05-16 16:26 UTC
 **Status:** Stack live; Authentik fully provisioned; typed Hono /v1 API serving real routes
 
 The runbook's prerequisites were sourced from `tasks/.env.creds` (gitignored). The user opted for the "fast path" (option B in the kickoff exchange): use the master credentials once for setup, rotate after. **All four credentials below MUST be rotated** before this is treated as production.
@@ -483,3 +483,12 @@ Production `https://esharevice.com/` mobile audit went from 86 / 92 / 96 / 100 t
 - **Image:** `ghcr.io/myndgrid/esharevice-web:c18ade3` (`sha256:9672af89…`), built with `--no-cache-filter check`; real layer push. API image untouched (still `5f70019a…`).
 - **Deploy:** web-only `docker compose up -d --force-recreate web`. Healthy in ~7 s. No DB migration, no env changes.
 - **Verification:** running web container digest matches push exactly. `https://esharevice.com/` returns 200 with a srcset containing all three variants (400/800/1600) — confirms the global loader is rewriting URLs in production. Direct CDN URLs (no `/_next/image` proxy roundtrip).
+
+### 2026-05-16 16:26 UTC — PWA basics + brand-mark refresh
+
+- **What shipped:** Web App Manifest, four pre-rendered PWA icon variants (192 / 512 / maskable-512 / apple-touch 180), `@ducanh2912/next-pwa`-generated service worker, and a new two-circle brand mark (sky-blue over amber) replacing the previous "e" tile across favicon.ico, icon.svg, and every PWA icon. Full design + gotchas in [docs/features/2026-05-16_pwa-basics.md](../docs/features/2026-05-16_pwa-basics.md).
+- **SW caching strategy:** plugin defaults (CacheFirst for static, NetworkFirst for HTML, StaleWhileRevalidate for /\_next/image, etc.) PLUS a custom-priority `NetworkOnly` route for same-origin `/api/*` so the SSE proxy at `/api/messages/:id/events` isn't killed by the default 10s NetworkFirst timeout. Verified via post-build inspection of `public/sw.js` — our override lands at registerRoute position #2 (before the plugin's default `/api/*` NetworkFirst at #15).
+- **Build artifacts gitignored:** `public/sw.js` + `public/workbox-*.js` are emitted on every `next build`; treating them as build output, not source. ESLint flat-config also ignores them so the minified bundle doesn't trip no-undef on `importScripts`.
+- **New dev dep:** `to-ico` for generating the multi-resolution favicon.ico from the same SVG logo via `pnpm gen:icons`. Build-time only; no runtime presence.
+- **Image:** web only — API unchanged. Build/push/deploy details land in this entry once the roll completes.
+- **Verification target:** image digest matches push exactly; `/manifest.webmanifest` returns 200 with the new icons; `/icon-192.png` / `/icon-512.png` / `/apple-touch-icon.png` all 200; favicon.ico is the new logo (manual visual check); SSE on `/messages/[id]` still streams (proves the NetworkOnly `/api/*` override took effect).

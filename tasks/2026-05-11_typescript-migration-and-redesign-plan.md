@@ -1,7 +1,7 @@
 # Task: TypeScript Migration & Frontend Redesign Plan
 
 **Created:** 2026-05-11 00:00 UTC
-**Last Updated:** 2026-05-16 16:00 UTC
+**Last Updated:** 2026-05-16 16:26 UTC
 **Status:** v3.4 — weeks 1-3 shipped + first web slice live (OIDC login + design system + home/profile pages)
 
 ---
@@ -999,6 +999,10 @@ These are isolated, reversible, low-risk fixes that don't require the new stack:
 ---
 
 ## Progress Log
+
+### 2026-05-16 16:26 UTC — PWA basics + brand-mark refresh
+
+Three-part ship: (1) new two-circle brand mark replaces the "e" tile across `app/icon.svg`, `app/favicon.ico` (multi-res 16/32/48), and four pre-rendered PWA icon variants in `public/` (192 / 512 / maskable-512 / apple-touch 180); (2) `app/manifest.ts` declares the install contract (`display: "standalone"`, brand colors, icon variants); (3) `@ducanh2912/next-pwa` generates a Workbox-backed service worker on every `next build` that precaches the JS/CSS shell + StaleWhileRevalidates images + NetworkFirst HTML — with a custom-priority `NetworkOnly` route for `/api/*` so the SSE proxy at `/api/messages/:id/events` isn't killed by the default 10s NetworkFirst timeout. Reproducible icon generation via `apps/web/scripts/generate-pwa-icons.mjs` (sharp + to-ico). Full feature doc: [docs/features/2026-05-16_pwa-basics.md](../docs/features/2026-05-16_pwa-basics.md). Lint + typecheck workspace-wide green; local build emits the expected SW + workbox bundle.
 
 ### 2026-05-16 16:00 UTC — next/image migration with R2 variant-aware loader
 

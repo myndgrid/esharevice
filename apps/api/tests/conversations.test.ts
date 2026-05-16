@@ -282,6 +282,33 @@ describe.runIf(DB_AVAILABLE)("conversations + messages queries (integration)", (
     expect(conv1MsgIds).toHaveLength(60);
     expect(conv1Id).not.toBe(conv2Id);
   });
+
+  it("last_read_at: initiator's column updates independently of owner's", async () => {
+    // Regression guard for the email-suppression path. The POST /messages
+    // handler must update ONLY the sender's `last_read_at` column on insert
+    // — touching the recipient's column would defeat suppression (the
+    // recipient's "did they see this thread recently" check is what gates
+    // the new-message email). The PATCH /:id/read handler has the same
+    // requirement: viewer updates their own column, never the other party's.
+    const db = getDb();
+    const stamp = new Date();
+    await db
+      .update(conversations)
+      .set({ initiator_last_read_at: stamp })
+      .where(eq(conversations.id, conv1Id));
+
+    const rows = await db
+      .select({
+        initiator_last_read_at: conversations.initiator_last_read_at,
+        owner_last_read_at: conversations.owner_last_read_at,
+      })
+      .from(conversations)
+      .where(eq(conversations.id, conv1Id))
+      .limit(1);
+
+    expect(rows[0]?.initiator_last_read_at).not.toBeNull();
+    expect(rows[0]?.owner_last_read_at).toBeNull();
+  });
 });
 
 async function probeDb(): Promise<boolean> {

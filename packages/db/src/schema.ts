@@ -127,6 +127,11 @@ export const conversations = pgTable(
     // Updated on every message send — drives the "most-recent thread first"
     // ordering on the list view without needing a subquery.
     last_message_at: timestamp("last_message_at", { withTimezone: true }).notNull().defaultNow(),
+    // Per-participant "last seen" timestamp. Used by the email-on-new-message
+    // helper to suppress notifications when the recipient is actively engaged.
+    // NULL = "never opened the thread"; receiver still gets an email.
+    initiator_last_read_at: timestamp("initiator_last_read_at", { withTimezone: true }),
+    owner_last_read_at: timestamp("owner_last_read_at", { withTimezone: true }),
   },
   (t) => [
     uniqueIndex("conversations_item_initiator_uq").on(t.item_id, t.initiator_id),

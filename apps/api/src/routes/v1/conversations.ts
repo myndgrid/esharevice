@@ -21,8 +21,17 @@ import { streamSSE } from "hono/streaming";
 import { requireAuth } from "../../middleware/auth.js";
 import { idempotency } from "../../middleware/idempotency.js";
 import { decodeCursor, encodeCursor } from "../../lib/cursor.js";
+import { env } from "../../env.js";
+import { sendNewMessageEmail } from "../../lib/email.js";
 import { publishMessage, subscribeToConversation } from "../../lib/message-bus.js";
 import type { AppEnv } from "../../app.js";
+
+/**
+ * "How fresh is fresh" for the email-on-new-message suppression rule.
+ * If the recipient's last_read_at is within this window when a new message
+ * lands, the SSE stream is delivering it live and an email would be noise.
+ */
+const ACTIVE_VIEW_WINDOW_MS = 2 * 60 * 1000;
 
 const route = new OpenAPIHono<AppEnv>();
 
@@ -458,7 +467,13 @@ route.openapi(
     const db = getDb();
 
     const convRows = await db
-      .select({ initiator_id: conversations.initiator_id, owner_id: exchangeItems.user_id })
+      .select({
+        initiator_id: conversations.initiator_id,
+        owner_id: exchangeItems.user_id,
+        initiator_last_read_at: conversations.initiator_last_read_at,
+        owner_last_read_at: conversations.owner_last_read_at,
+        item_service: exchangeItems.service,
+      })
       .from(conversations)
       .innerJoin(exchangeItems, eq(conversations.item_id, exchangeItems.id))
       .where(eq(conversations.id, id))
@@ -481,10 +496,19 @@ route.openapi(
     const msg = inserted[0];
     if (!msg) throw new HTTPException(500, { message: "insert returned no rows" });
 
-    // Bump the conversation's last_message_at so list ordering reflects activity.
+    // Bump last_message_at + mark the sender as read (sending is implicit
+    // read — they obviously know about the thread's new state). The other
+    // participant's last_read_at stays at whatever it was; it's checked
+    // below for the email-suppression decision.
+    const senderIsInitiator = conv.initiator_id === u.id;
     await db
       .update(conversations)
-      .set({ last_message_at: now })
+      .set({
+        last_message_at: now,
+        ...(senderIsInitiator
+          ? { initiator_last_read_at: now }
+          : { owner_last_read_at: now }),
+      })
       .where(eq(conversations.id, id));
 
     const apiMsg = toApiMessage(msg);
@@ -493,7 +517,119 @@ route.openapi(
     // message at the same wall-clock moment instead of the sender's
     // optimistic UI racing ahead by an event-loop tick.
     publishMessage(id, apiMsg);
+
+    // Suppression-aware email notification — fire-and-forget so a slow
+    // Resend round-trip never delays the sender's 201. Only sends if the
+    // recipient hasn't viewed the thread within ACTIVE_VIEW_WINDOW_MS;
+    // when they're actively viewing, the SSE stream already delivered
+    // the message and an email would be redundant noise.
+    void (async () => {
+      try {
+        const recipientId = senderIsInitiator ? conv.owner_id : conv.initiator_id;
+        const recipientLastRead = senderIsInitiator
+          ? conv.owner_last_read_at
+          : conv.initiator_last_read_at;
+
+        if (
+          recipientLastRead &&
+          now.getTime() - recipientLastRead.getTime() < ACTIVE_VIEW_WINDOW_MS
+        ) {
+          return; // they're actively viewing — SSE delivers it
+        }
+
+        const [recipient] = await db
+          .select({
+            email: users.email,
+            first_name: users.first_name,
+            last_name: users.last_name,
+          })
+          .from(users)
+          .where(eq(users.id, recipientId))
+          .limit(1);
+        if (!recipient) return;
+
+        const senderName =
+          `${u.first_name ?? ""} ${u.last_name ?? ""}`.trim() || "Someone";
+        const recipientName =
+          `${recipient.first_name ?? ""} ${recipient.last_name ?? ""}`.trim() || "there";
+        const base =
+          env.WEB_PUBLIC_URL ?? env.OIDC_ISSUER.replace(/\/application\/o\/[^/]+\/?$/, "");
+        await sendNewMessageEmail({
+          to: recipient.email,
+          recipientName,
+          senderName,
+          itemService: conv.item_service,
+          preview: body.body,
+          threadUrl: `${base.replace(/\/$/, "")}/messages/${id}`,
+        });
+      } catch (err) {
+        // The helper already swallows Resend errors; defensive belt-and-
+        // suspenders for an unexpected DB hiccup in the suppression check.
+        console.warn("[message] notification setup failed:", err);
+      }
+    })();
+
     return c.json(apiMsg, 201);
+  },
+);
+
+// ─────────────────────── PATCH /v1/conversations/{id}/read
+//
+// "I'm looking at this thread now." Sets the viewer's `last_read_at` to
+// now() so the next message arrival in the suppression window doesn't
+// fire an email. Idempotent: re-PATCHing just bumps the timestamp.
+//
+// 204 on success. Skips the idempotency middleware because the operation
+// is naturally idempotent at the SQL layer + the cache hit/miss machinery
+// would only add overhead.
+route.openapi(
+  createRoute({
+    method: "patch",
+    path: "/conversations/{id}/read",
+    tags: ["messages"],
+    summary: "Mark a conversation as read by the authenticated participant.",
+    security: [{ Bearer: [] }],
+    middleware: [requireAuth] as const,
+    request: { params: IdParamSchema },
+    responses: {
+      204: { description: "Marked read" },
+      401: { description: "Unauthenticated", content: problemContent },
+      403: { description: "Not a participant", content: problemContent },
+      404: { description: "Not Found", content: problemContent },
+    },
+  }),
+  async (c) => {
+    const u = c.get("user");
+    if (!u) throw new HTTPException(401, { message: "no user attached" });
+    const { id } = c.req.valid("param");
+    const db = getDb();
+
+    const convRows = await db
+      .select({
+        initiator_id: conversations.initiator_id,
+        owner_id: exchangeItems.user_id,
+      })
+      .from(conversations)
+      .innerJoin(exchangeItems, eq(conversations.item_id, exchangeItems.id))
+      .where(eq(conversations.id, id))
+      .limit(1);
+    const conv = convRows[0];
+    if (!conv) throw new HTTPException(404, { message: "Not Found" });
+    if (conv.initiator_id !== u.id && conv.owner_id !== u.id) {
+      throw new HTTPException(403, { message: "Not a participant in this conversation" });
+    }
+
+    const now = new Date();
+    await db
+      .update(conversations)
+      .set(
+        conv.initiator_id === u.id
+          ? { initiator_last_read_at: now }
+          : { owner_last_read_at: now },
+      )
+      .where(eq(conversations.id, id));
+
+    return new Response(null, { status: 204 });
   },
 );
 

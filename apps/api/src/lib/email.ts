@@ -32,6 +32,17 @@ export type SaverArchivedEmailInput = {
   itemService: string;
 };
 
+export type NewMessageEmailInput = {
+  to: string;
+  recipientName: string;
+  senderName: string;
+  itemService: string;
+  /** Trimmed message body — caller truncates to ~120 chars. */
+  preview: string;
+  /** Deep-link to the conversation page. */
+  threadUrl: string;
+};
+
 /**
  * Owner-side "Your listing was reserved" email.
  *
@@ -123,6 +134,46 @@ export async function sendItemArchivedEmailToSaver(
       greeting: `Hi ${input.saverName},`,
       lead: `"<strong>${esc(input.itemService)}</strong>" — an item you bookmarked on e-Sharevice — has been removed by its owner and is no longer available.`,
       footer: "We'll keep showing you new listings on the home page.",
+    }),
+  });
+}
+
+/**
+ * "You have a new message" email.
+ *
+ * Sent to the OTHER participant of a conversation when a message lands AND
+ * the recipient hasn't opened the thread recently. The caller does the
+ * suppression check against `last_read_at` before invoking this — the
+ * helper itself is unconditional once you've decided to send.
+ */
+export async function sendNewMessageEmail(input: NewMessageEmailInput): Promise<void> {
+  // Hard preview cap — the body field is up to 4000 chars; an email subject
+  // line truncated at 80 keeps the most-clicked metadata visible across
+  // every client. The HTML preview gets a 240-char window before ellipsis.
+  const subjectPreview =
+    input.preview.length > 80 ? `${input.preview.slice(0, 77)}…` : input.preview;
+  const htmlPreview =
+    input.preview.length > 240 ? `${input.preview.slice(0, 237)}…` : input.preview;
+  await sendTransactional({
+    to: input.to,
+    subject: `${input.senderName}: ${subjectPreview}`,
+    text: [
+      `Hi ${input.recipientName},`,
+      "",
+      `${input.senderName} sent you a message about "${input.itemService}" on e-Sharevice:`,
+      "",
+      `  ${input.preview}`,
+      "",
+      `Reply: ${input.threadUrl}`,
+      "",
+      "— e-Sharevice",
+    ].join("\n"),
+    html: bodyHtml({
+      greeting: `Hi ${input.recipientName},`,
+      lead: `<strong>${esc(input.senderName)}</strong> sent you a message about "<strong>${esc(input.itemService)}</strong>" on e-Sharevice:<br><br><span style="display: block; margin: 12px 0; padding: 10px 14px; border-left: 3px solid oklch(43% 0.15 195); background: #f6f8fa; color: #333; white-space: pre-wrap;">${esc(htmlPreview)}</span>`,
+      cta: { label: "Reply", href: input.threadUrl },
+      footer:
+        "You're receiving this because you have an active conversation on e-Sharevice. Replies happen on the thread page.",
     }),
   });
 }

@@ -16,12 +16,12 @@ export async function Header(): Promise<React.ReactElement> {
           e-Sharevice
         </Link>
 
-        <nav className="flex items-center gap-2">
+        <nav className="flex items-center gap-3">
           <ThemeToggle />
           {session ? (
             <>
               <Link href="/items/new">
-                <Button variant="primary" size="sm">+ New</Button>
+                <Button variant="primary" size="md">+ New</Button>
               </Link>
               <Link href="/profile" aria-label="Open profile">
                 <Avatar size="sm" name="You" />
@@ -30,10 +30,10 @@ export async function Header(): Promise<React.ReactElement> {
           ) : (
             <>
               <Link href="/api/auth/login?return_to=/&signup=1" prefetch={false}>
-                <Button variant="secondary" size="sm">Sign up</Button>
+                <Button variant="secondary" size="md">Sign up</Button>
               </Link>
               <Link href="/api/auth/login?return_to=/" prefetch={false}>
-                <Button variant="primary" size="sm">Sign in</Button>
+                <Button variant="primary" size="md">Sign in</Button>
               </Link>
             </>
           )}

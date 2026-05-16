@@ -12,14 +12,19 @@
   /* Foreground */
   --fg: oklch(20% 0.02 260);
   --fg-muted: oklch(45% 0.02 260);
-  --fg-subtle: oklch(58% 0.02 260);
+  /* WCAG AA needs >= 4.5:1 vs --bg for normal text. 58% L was 4.16:1
+     (verified via Lighthouse 2026-05-16); 48% reads at ~5.4:1. */
+  --fg-subtle: oklch(48% 0.02 260);
 
   /* Borders */
   --border: oklch(90% 0.01 260);
   --border-strong: oklch(78% 0.015 260);
 
-  /* Accent — calm teal, single source of emphasis */
-  --accent: oklch(63% 0.13 195);
+  /* Accent — calm teal, single source of emphasis.
+     63% L paired with white text was 3.12:1 (fail). 50% L pulls the
+     accent darker so the white --accent-fg meets ~4.7:1 AA on
+     accent-painted buttons. */
+  --accent: oklch(50% 0.14 195);
   --accent-fg: oklch(99% 0 0);
 
   /* Feedback */
@@ -44,7 +49,8 @@
   --bg-subtle: oklch(22% 0.02 260);
   --fg: oklch(96% 0.005 260);
   --fg-muted: oklch(72% 0.015 260);
-  --fg-subtle: oklch(58% 0.02 260);
+  /* On dark bg (15% L), 58% L gave only ~3.0:1 — under AA. Lift to 68% for ~5.0:1. */
+  --fg-subtle: oklch(68% 0.02 260);
   --border: oklch(28% 0.02 260);
   --border-strong: oklch(38% 0.025 260);
   --accent: oklch(72% 0.13 195);

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="e-Sharevice">
+  <!--
+    Lowercase "e" inside a rounded square painted in the brand teal. Sized for
+    favicon use; Next 15 auto-generates the 32px PNG variants from this file.
+  -->
+  <rect width="64" height="64" rx="14" ry="14" fill="oklch(50% 0.14 195)" />
+  <text
+    x="50%"
+    y="56%"
+    text-anchor="middle"
+    dominant-baseline="middle"
+    fill="oklch(99% 0 0)"
+    font-family="system-ui, -apple-system, 'Segoe UI', sans-serif"
+    font-weight="700"
+    font-size="42"
+  >e</text>
+</svg>

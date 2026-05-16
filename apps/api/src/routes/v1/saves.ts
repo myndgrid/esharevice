@@ -206,7 +206,7 @@ route.openapi(
     if (cursor) {
       // Tuple comparison on (saves.created_at, items.id) for stable cursor.
       conditions.push(
-        sql`(${exchangeItemSaves.created_at}, ${exchangeItems.id}) < (${new Date(cursor.ts)}, ${cursor.id}::uuid)`,
+        sql`(${exchangeItemSaves.created_at}, ${exchangeItems.id}) < (${new Date(cursor.ts).toISOString()}, ${cursor.id}::uuid)`,
       );
     }
 

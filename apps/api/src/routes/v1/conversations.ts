@@ -1,6 +1,6 @@
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
-import { and, asc, desc, eq, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import {
   conversations,
   exchangeItems,
@@ -201,8 +201,13 @@ route.openapi(
       )!,
     ];
     if (cursor) {
+      // Pass the timestamp as an ISO string. Sentry caught a raw `Date`
+      // here being shovelled into postgres.js's parameter binding, which
+      // tried `Buffer.byteLength(date)` and threw — the typed Drizzle
+      // columns serialise Date for INSERTs but raw `sql` template
+      // interpolation does NOT, so the conversion has to be manual.
       conditions.push(
-        sql`(${conversations.last_message_at}, ${conversations.id}) < (${new Date(cursor.ts)}, ${cursor.id}::uuid)`,
+        sql`(${conversations.last_message_at}, ${conversations.id}) < (${new Date(cursor.ts).toISOString()}, ${cursor.id}::uuid)`,
       );
     }
 
@@ -229,22 +234,33 @@ route.openapi(
       r.conv.initiator_id === u.id ? r.owner_id : r.conv.initiator_id,
     );
 
+    // Use Drizzle's `inArray` helper rather than `sql\`= ANY(${...}::uuid[])\``.
+    // Postgres-js renders an interpolated JS array as a record/tuple, not an
+    // array literal, so the runtime cast `record → uuid[]` errors. Sentry
+    // caught this on every /v1/conversations call: PostgresError "cannot cast
+    // type record to uuid[]". `inArray` expands to `IN ($1, $2, …)` which is
+    // both type-correct and uses the same indexes.
     const otherPartyRows =
       otherPartyIds.length > 0
         ? await db
             .select({ id: users.id, first_name: users.first_name, last_name: users.last_name })
             .from(users)
-            .where(sql`${users.id} = ANY(${otherPartyIds}::uuid[])`)
+            .where(inArray(users.id, otherPartyIds))
         : [];
     const otherPartyById = new Map(otherPartyRows.map((r) => [r.id, r]));
 
     // Latest message per conversation (DISTINCT ON pattern in Postgres).
+    // sql.join builds the IN-list as proper parameterised placeholders;
+    // same fix shape as above for the same reason.
     const previewRows =
       convIds.length > 0
         ? await db.execute<{ conversation_id: string; body: string }>(sql`
             SELECT DISTINCT ON ("conversation_id") "conversation_id", "body"
             FROM ${messages}
-            WHERE "conversation_id" = ANY(${convIds}::uuid[])
+            WHERE "conversation_id" IN (${sql.join(
+              convIds.map((id) => sql`${id}::uuid`),
+              sql`, `,
+            )})
             ORDER BY "conversation_id", "created_at" DESC, "id" DESC
           `)
         : { rows: [] };
@@ -388,7 +404,7 @@ route.openapi(
     if (cursor) {
       // Tuple comparison — for ASC ordering we want messages AFTER the cursor.
       conditions.push(
-        sql`(${messages.created_at}, ${messages.id}) > (${new Date(cursor.ts)}, ${cursor.id}::uuid)`,
+        sql`(${messages.created_at}, ${messages.id}) > (${new Date(cursor.ts).toISOString()}, ${cursor.id}::uuid)`,
       );
     }
     const rows = await db

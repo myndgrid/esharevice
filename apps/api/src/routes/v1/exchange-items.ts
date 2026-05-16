@@ -94,7 +94,7 @@ route.openapi(
     if (cursor) {
       // Tuple comparison: (created_at, id) < (cursor.ts, cursor.id). Postgres native.
       conditions.push(
-        sql`(${exchangeItems.created_at}, ${exchangeItems.id}) < (${new Date(cursor.ts)}, ${cursor.id}::uuid)`,
+        sql`(${exchangeItems.created_at}, ${exchangeItems.id}) < (${new Date(cursor.ts).toISOString()}, ${cursor.id}::uuid)`,
       );
     }
     if (q && q.trim()) {

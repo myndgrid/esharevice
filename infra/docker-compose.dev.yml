@@ -12,8 +12,11 @@ services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
+    # Host port shifted off the default to coexist with other local Postgres
+    # instances (e.g. unrelated docker projects). Container port unchanged.
+    # The dev .env in apps/api should connect to localhost:5433.
     ports:
-      - "5432:5432"
+      - "5433:5432"
     environment:
       POSTGRES_DB: esharevice
       POSTGRES_USER: esharevice
@@ -30,8 +33,11 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    # Host port shifted off the default to coexist with other local Redis
+    # instances. Container port unchanged. The dev .env in apps/api should
+    # connect to localhost:6380.
     ports:
-      - "6379:6379"
+      - "6380:6379"
     command: ["redis-server", "--appendonly", "yes"]
     volumes:
       - redis_data_dev:/data

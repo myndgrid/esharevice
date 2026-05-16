@@ -62,6 +62,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={inter.variable} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeBootstrap }} />
+        {/*
+          Inline the critical SEO tags so they're in the initial SSR <head>,
+          not streamed in via AsyncMetadataOutlet at the end of <body>.
+          `export const dynamic = "force-dynamic"` above defers the Next 15
+          metadata API, which leaves <title> + <meta name="description"> at
+          the bottom of <body> until hydration — Lighthouse's static SEO
+          audit doesn't see them there and drops the score 4 points. The
+          duplicate tags get deduped by the browser; canonical source for
+          dynamic per-page titles remains the metadata API.
+        */}
+        <title>e-Sharevice</title>
+        <meta
+          name="description"
+          content="A community skill and item exchange."
+        />
       </head>
       <body className="bg-bg text-fg pb-[calc(3.5rem+env(safe-area-inset-bottom))] md:pb-0">
         {/*

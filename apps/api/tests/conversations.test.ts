@@ -283,6 +283,58 @@ describe.runIf(DB_AVAILABLE)("conversations + messages queries (integration)", (
     expect(conv1Id).not.toBe(conv2Id);
   });
 
+  it("unread-count SQL: viewer's own messages don't count; mark-read clears the count", async () => {
+    // Mirrors the SQL in GET /v1/conversations/unread-count verbatim.
+    // The test resets the read-state to a known baseline (both columns
+    // NULL → epoch fallback) then asserts:
+    //   - viewer's OWN messages are excluded (sender_id != viewer.id)
+    //   - bumping the viewer's last_read_at drops the count to 0
+    const db = getDb();
+
+    // Belt-and-suspenders: clear any state the prior test wrote.
+    await db
+      .update(conversations)
+      .set({ initiator_last_read_at: null, owner_last_read_at: null })
+      .where(eq(conversations.id, conv1Id));
+
+    const unreadFor = async (viewerId: string): Promise<number> => {
+      const rows = (await db.execute(sql`
+        SELECT COUNT(*)::int AS total
+        FROM ${messages} m
+        JOIN ${conversations} c ON c.id = m.conversation_id
+        JOIN ${exchangeItems} ei ON ei.id = c.item_id
+        WHERE
+          (c.initiator_id = ${viewerId}::uuid OR ei.user_id = ${viewerId}::uuid)
+          AND m.sender_id != ${viewerId}::uuid
+          AND m.created_at > COALESCE(
+            CASE
+              WHEN c.initiator_id = ${viewerId}::uuid THEN c.initiator_last_read_at
+              ELSE c.owner_last_read_at
+            END,
+            'epoch'::timestamptz
+          )
+      `)) as unknown as { total: number }[];
+      return rows[0]?.total ?? 0;
+    };
+
+    // Fixture sent 60 messages alternating A↔B + 2 in conv2 (C↔B).
+    // From A's POV: half of conv1 was sent by B (30 messages) + zero from conv2.
+    expect(await unreadFor(initiatorAId)).toBe(30);
+    // From B's (owner) POV: half of conv1 sent by A (30) + 1 from C in conv2.
+    expect(await unreadFor(ownerId)).toBe(31);
+
+    // Mark A as read on conv1 → A's unread drops to 0. The fixture uses
+    // synthetic July dates; "now" is well before the messages, so set the
+    // read mark explicitly past the conv1 tail (2026-07-01T10:00:00.060Z).
+    await db
+      .update(conversations)
+      .set({ initiator_last_read_at: new Date("2026-07-01T10:01:00.000Z") })
+      .where(eq(conversations.id, conv1Id));
+    expect(await unreadFor(initiatorAId)).toBe(0);
+    // B is unaffected by A's read state.
+    expect(await unreadFor(ownerId)).toBe(31);
+  });
+
   it("last_read_at: initiator's column updates independently of owner's", async () => {
     // Regression guard for the email-suppression path. The POST /messages
     // handler must update ONLY the sender's `last_read_at` column on insert

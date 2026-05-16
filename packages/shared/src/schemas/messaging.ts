@@ -33,3 +33,16 @@ export const MessageCreate = z.object({
   body: z.string().min(1).max(4000),
 });
 export type MessageCreate = z.infer<typeof MessageCreate>;
+
+/**
+ * Response for GET /v1/conversations/unread-count.
+ *
+ * `total` is the count of unread messages across every conversation the
+ * viewer participates in — messages newer than their per-conversation
+ * `last_read_at` AND not authored by themselves. Drives the badge on the
+ * Messages tab.
+ */
+export const UnreadCount = z.object({
+  total: z.number().int().nonnegative(),
+});
+export type UnreadCount = z.infer<typeof UnreadCount>;

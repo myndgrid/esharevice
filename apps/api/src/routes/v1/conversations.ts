@@ -15,6 +15,7 @@ import {
   CursorQuery,
   Message,
   MessageCreate,
+  UnreadCount,
   cursorPage,
 } from "@esharevice/shared";
 import { streamSSE } from "hono/streaming";
@@ -53,6 +54,7 @@ const ConversationListSchema = cursorPage(Conversation).openapi("ConversationPag
 const MessageSchema = Message.openapi("Message");
 const MessageCreateSchema = MessageCreate.openapi("MessageCreate");
 const MessageListSchema = cursorPage(Message).openapi("MessagePage");
+const UnreadCountSchema = UnreadCount.openapi("UnreadCount");
 
 /** Build the Conversation API response shape from a joined row. */
 function toApiConversation(
@@ -303,6 +305,63 @@ route.openapi(
         ? encodeCursor({ ts: last.conv.last_message_at.toISOString(), id: last.conv.id })
         : null;
     return c.json({ items, next_cursor }, 200);
+  },
+);
+
+// ─────────────────────── GET /v1/conversations/unread-count
+//
+// Total unread messages across every conversation the viewer participates
+// in. Drives the badge on the Messages tab.
+//
+// "Unread" = message.created_at > viewer's per-conversation last_read_at
+// AND message.sender_id != viewer.id. The sender_id filter guards the
+// pre-feature backfill case (all *_last_read_at NULL → epoch fallback
+// would otherwise count the viewer's own historical messages as unread)
+// and is defensively redundant for new messages (POST /messages auto-bumps
+// the sender's last_read_at, so their own message is never unread to them).
+//
+// Registered BEFORE /conversations/{id} so Hono's radix tree matches the
+// static path first — `unread-count` would 400 on the UUID schema if it
+// somehow fell through, but precedence avoids the noise.
+route.openapi(
+  createRoute({
+    method: "get",
+    path: "/conversations/unread-count",
+    tags: ["messages"],
+    summary: "Total unread messages across the viewer's conversations.",
+    security: [{ Bearer: [] }],
+    middleware: [requireAuth] as const,
+    responses: {
+      200: { description: "Unread total", content: { "application/json": { schema: UnreadCountSchema } } },
+      401: { description: "Unauthenticated", content: problemContent },
+    },
+  }),
+  async (c) => {
+    const u = c.get("user");
+    if (!u) throw new HTTPException(401, { message: "no user attached" });
+    const db = getDb();
+
+    // postgres-js: `db.execute(sql\`…\`)` returns rows array directly
+    // (bug-registry: `[Type] db.execute(sql\`…\`) result shape differs by driver`).
+    const rows = (await db.execute(sql`
+      SELECT COUNT(*)::int AS total
+      FROM ${messages} m
+      JOIN ${conversations} c ON c.id = m.conversation_id
+      JOIN ${exchangeItems} ei ON ei.id = c.item_id
+      WHERE
+        (c.initiator_id = ${u.id}::uuid OR ei.user_id = ${u.id}::uuid)
+        AND m.sender_id != ${u.id}::uuid
+        AND m.created_at > COALESCE(
+          CASE
+            WHEN c.initiator_id = ${u.id}::uuid THEN c.initiator_last_read_at
+            ELSE c.owner_last_read_at
+          END,
+          'epoch'::timestamptz
+        )
+    `)) as unknown as { total: number }[];
+
+    const total = rows[0]?.total ?? 0;
+    return c.json({ total }, 200);
   },
 );
 

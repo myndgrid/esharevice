@@ -87,6 +87,13 @@ services:
       AUTHENTIK_EMAIL__PASSWORD: ${AUTHENTIK_EMAIL_PASSWORD:-}
       AUTHENTIK_EMAIL__USE_TLS: "true"
       AUTHENTIK_EMAIL__FROM: ${AUTHENTIK_EMAIL_FROM:-noreply@${DOMAIN:?required}}
+      # Social OAuth — optional. Empty defaults make the blueprint template
+      # safe to drop in even before the user creates the upstream OAuth apps.
+      # Authentik's `!Env` blueprint tag reads these at apply time.
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
+      GITHUB_OAUTH_CLIENT_ID: ${GITHUB_OAUTH_CLIENT_ID:-}
+      GITHUB_OAUTH_CLIENT_SECRET: ${GITHUB_OAUTH_CLIENT_SECRET:-}
     volumes:
       - authentik_media:/media
       - authentik_certs:/certs
@@ -114,6 +121,12 @@ services:
       AUTHENTIK_POSTGRESQL__NAME: authentik
       AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_POSTGRES_PASSWORD:?required}
       AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:?required}
+      # The worker is what applies blueprints; threading the OAuth env into
+      # this service too lets `!Env` resolve when social.yaml is enabled.
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
+      GITHUB_OAUTH_CLIENT_ID: ${GITHUB_OAUTH_CLIENT_ID:-}
+      GITHUB_OAUTH_CLIENT_SECRET: ${GITHUB_OAUTH_CLIENT_SECRET:-}
     volumes:
       - authentik_media:/media
       - authentik_certs:/certs

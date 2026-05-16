@@ -54,6 +54,8 @@ You are a **senior defensive software engineer**. Mistakes in software have real
 | `infra/authentik/blueprints/esharevice.yaml` | Declarative OIDC provider config (3 Applications) | Auto-applied on Authentik boot; re-apply via `POST /api/v3/managed/blueprints/{pk}/apply/` |
 | `infra/scripts/backup.sh` | Daily `pg_dump` → gzip → age-encrypt → rclone to B2 | Cron'd at 03:00 UTC; reads `/etc/esharevice-backup.env` (root-only) |
 | `infra/scripts/restore-drill.sh` | Quarterly restore drill into a throwaway Postgres container | Tolerates empty pre-migration DB |
+| `scripts/lighthouse-auth.cjs` | Lighthouse CI puppeteerScript — drives Authentik flow-executor to obtain an `lh-bot` session | Consumed by `lighthouserc.json` `ci.collect.puppeteerScript`; reads `LH_USER` + `LH_PASSWORD` env. No-op if either is missing |
+| `docs/operations/production-fixtures.md` | Authoritative reference for load-bearing production state outside code | Lists the `lh-bot` Authentik user + the pinned Lorem Ipsum demo listing. Don't delete either without reading this first |
 
 ### Key Architectural Facts
 

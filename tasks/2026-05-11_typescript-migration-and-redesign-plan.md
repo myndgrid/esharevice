@@ -1000,6 +1000,10 @@ These are isolated, reversible, low-risk fixes that don't require the new stack:
 
 ## Progress Log
 
+### 2026-05-16 14:05 UTC — `/v1/conversations` 500-cascade + R2 CORS
+
+Three layered bugs on `/v1/conversations` surfaced after the SSE deploy; took two real container rolls (a third was a build-cache re-tag false-positive) to clear Sentry. Root causes: Drizzle `sql\`= ANY(${arr}::uuid[])\`` renders a record, not an array (use `inArray()` / `sql.join`); raw `Date` in `sql\`…\`` template hits postgres-js `Buffer.byteLength` (use `.toISOString()`); `db.execute(sql\`…\`)` returns rows array directly under postgres-js, not `{rows:[…]}` (driver-shape mismatch). Plus a separate R2 CORS issue blocking cross-origin image loads from `cdn.esharevice.com` — set a bucket rule allowing GET/HEAD from production + dev origins. Four new bug-registry entries (counter 43 → 47). Full incident log: [tasks/2026-05-16_conversations-500-cascade.md](2026-05-16_conversations-500-cascade.md).
+
 ### 2026-05-16 09:15 UTC — Messages Phase B-1: real-time via SSE
 
 Replaces the 5 s poll with Server-Sent Events. New API route `GET /v1/conversations/{id}/events` streams via Hono's `streamSSE` from an in-process EventEmitter pub/sub; the POST `/messages` handler publishes after each successful insert. Caddy splits `api.{$DOMAIN}` into an `@sse` handle with `flush_interval -1` + no compression, leaving JSON traffic on the existing zstd/gzip handle. Web reaches the stream through a same-origin Next route handler that bridges browser `EventSource` (no header support) to the API's Bearer-authed endpoint; the proxy resolves the session cookie server-side, opens the upstream with the access token, pipes the body, and forwards client abort. 30 s polling stays in place as a fallback for environments that block SSE. Phase B-2 (email-on-new-message) still deferred.

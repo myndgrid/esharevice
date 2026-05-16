@@ -966,6 +966,30 @@ Don't trust the original `File` to round-trip through a server-action FormData �
 
 ---
 
+### [Type] Drizzle `sql\`= ANY(${jsArray}::uuid[])\`` Renders a Record, Not an Array
+**Description:** `sql\`WHERE id = ANY(${jsArrayOfUUIDs}::uuid[])\`` looks right but Drizzle's parameter binding serialises the JS array as a record/tuple (Postgres `(v1, v2, ...)`), not a Postgres array literal. The runtime cast `record → uuid[]` then errors: `PostgresError: cannot cast type record to uuid[]`. Same shape applies for `text[]`, `int[]`, etc. — any column-array cast on an interpolated JS array. The query plan looks fine in EXPLAIN but every actual call 500s.
+**Avoid:** Use Drizzle's `inArray(col, arr)` helper — it expands to `IN ($1, $2, …)` with proper parameter binding + uses the same indexes. When you need a raw `sql` template (DISTINCT ON, CTEs, etc.), build the IN-list via `sql.join(arr.map((v) => sql\`${v}::uuid\`), sql\`, \`)`. The cast lives on each element, not on the whole array.
+
+---
+
+### [Type] Raw `Date` in Drizzle `sql\`…\`` Template Hits postgres-js `byteLength`
+**Description:** Drizzle's typed columns convert `Date` → ISO string at the parameter-binding layer for INSERT / SELECT against a `timestamp` column. Raw `sql` template interpolation does NOT — it hands the `Date` straight to postgres-js, which falls through to `Buffer.byteLength(date)` and throws `TypeError: The "string" argument must be of type string or an instance of Buffer or ArrayBuffer. Received an instance of Date`. The latent bug only fires on the cursor branch (rare path); first request often works.
+**Avoid:** Pass `.toISOString()` explicitly on every `Date` you interpolate into a `sql` template. The pattern is `sql\`… > ${someDate.toISOString()}\``. Audit all cursor / range queries when this turns up; the same code-paste is usually present in multiple list endpoints.
+
+---
+
+### [Type] `db.execute(sql\`…\`)` Result Shape Differs by Driver
+**Description:** Drizzle's `db.execute(sql\`…\`)` returns a driver-native result. With **postgres-js** (which we use), that's the rows array directly. With **node-postgres**, it's a `{ rows: [...] }` envelope. Code that types the result as `{ rows: T[] }` and calls `.rows.map(…)` works against node-postgres but throws `Cannot read properties of undefined (reading 'map')` against postgres-js. The bug stays latent until the query actually runs without errors — fix one upstream issue and the NPE appears.
+**Avoid:** Treat `db.execute(sql\`…\`)` return as the rows array directly with postgres-js. Type via `as unknown as Row[]` to drop the wrong envelope assumption. Better yet, use Drizzle's typed `db.select()` API when the query fits — it has a stable, driver-agnostic shape.
+
+---
+
+### [Build] `docker buildx --push` Can Re-Tag Cached Manifests Instead of Rebuilding
+**Description:** When the source layers haven't actually changed (or buildx finds an identical cached manifest), `buildx build -t :latest -t :<sha> --push .` can finish in 3-5 seconds by re-pushing the existing manifest under the new tag. A successful "pushing manifest for … :sha@sha256:…" appears in the log, the digest matches, and the deploy looks healthy — but the container is running the OLD code. Symptom: a fix is committed + built + deployed + the API container reports "healthy", but Sentry keeps capturing the same pre-fix error.
+**Avoid:** Verify the digest on the running container vs. the one you JUST pushed. If they match, you're fine. If they differ AND the new digest matches an OLDER commit's manifest, the build was a cache-hit re-tag. Force a real rebuild with `--no-cache-filter <stage>` (cheap — invalidates one specific stage) or `--no-cache` (slow but bulletproof). Production diagnostics: a build that finishes in < 10 s is suspect; treat it as "did this actually rebuild?" until proven otherwise.
+
+---
+
 ### [Type] Cloudflare Global API Key — Legacy 37-Hex Format Has Been Replaced by `cfk_*`
 **Description:** Cloudflare's Global API Key used to be a 37-character hex string. As of late 2025 they've migrated to a `cfk_<50 chars>` prefixed format without widely updating docs. Authentication still uses `X-Auth-Email` + `X-Auth-Key` headers (NOT Bearer), but auth fails with "Unknown X-Auth-Key or X-Auth-Email" if you use the wrong email — and the legacy 37-hex format check is gone, so even the right key with the wrong email gives an unhelpful "Unknown" message.
 **Avoid:** When debugging Cloudflare API auth: (a) confirm the account-login email (not necessarily a developer-comms email), (b) use scoped API Tokens instead of the Global Key whenever possible — they use `Authorization: Bearer ...` and are clearly diagnosable as valid vs invalid via `GET /user/tokens/verify`, (c) the Global Key remains valuable mostly when scoped tokens can't reach an endpoint, but Cloudflare is actively deprecating it (cf. Origin CA Key deprecation banner in the dashboard).
@@ -1268,4 +1292,4 @@ node -e "const wtf = require('wtfnode'); setTimeout(wtf.dump, 5000);"
 
 ---
 
-*Last updated: 2026-05-16 05:05 UTC | Global SWE Agent Config | Adapt the Architecture and Project Structure sections per project — everything else applies universally. Bug registry: 43 entries (+1 from the 2026-05-16 Google OAuth activation: Authentik OAuth source doesn't auto-attach to the login screen — you must also update the identification stage's `sources` list).*
+*Last updated: 2026-05-16 14:05 UTC | Global SWE Agent Config | Adapt the Architecture and Project Structure sections per project — everything else applies universally. Bug registry: 47 entries (+4 from the 2026-05-16 /v1/conversations 500-cascade incident: `sql\`= ANY()\`` renders a record, raw `Date` in sql template hits byteLength, `db.execute()` shape differs by driver, and `docker buildx --push` can re-tag cached manifests instead of rebuilding).*

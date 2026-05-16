@@ -396,6 +396,22 @@ Real-time messaging shipped. Replaces the 5 s poll with EventSource through a sa
   - `/api/messages/<id>/events` on the web 401 unauth — same-origin proxy hits `auth()` server-side and rejects before opening the upstream.
 - **No new bug-registry entries.** The bind-mount caveat is already captured; the heartbeat + flush_interval pattern is the textbook fix for the existing `[Network] Long-Running Connection Dropped by Proxy` entry.
 
+### 2026-05-16 14:05 UTC — `/v1/conversations` 500-cascade incident + R2 CORS
+
+User reported "Internal server error (500)" on `/messages` shortly after the SSE deploy. Sentry surfaced two distinct issues — fixing the first exposed a follow-on, total three deploys before the route was clean. Plus a separate browser-side issue: cross-origin image loads from `cdn.esharevice.com` were CORS-blocked.
+
+- **Sentry triage:** the admin API key in `.env.creds` (`sentry_admin_permission_api_key`) authenticates `https://sentry.io/api/0/projects/mynd-grid-inc/esharevice-api/issues/?statsPeriod=24h&sort=date`. Two unresolved issues on `GET /v1/conversations`: a PostgresError on a record-vs-uuid[] cast (12 hits) and a TypeError on `Date → byteLength` (3 hits, on the messages-paginate endpoint).
+- **First fix (`31082b3 → 2be0571b…`):** swapped `sql\`= ANY(${arr}::uuid[])\`` for `inArray(col, arr)` + `sql.join(arr.map(x => sql\`${x}::uuid\`), sql\`, \`)`; added `.toISOString()` to every cursor `Date` (4 sites across exchange-items, saves, conversations, messages).
+- **Build cache trap:** the first build for `:31082b3` finished in 3.8 s and re-pushed the EXISTING `:8164bfc` manifest under the new tag without rebuilding. Container looked deployed (new tag, "healthy") but ran old code. Captured as a new bug-registry entry; `--no-cache-filter check` forces the rebuild.
+- **Second fix (`25538aa → 1f5054f4…`):** the cast fix made the DISTINCT-ON query actually run for the first time, surfacing `Cannot read properties of undefined (reading 'map')`. Root cause: `db.execute(sql\`…\`)` returns the rows array directly under postgres-js (not the node-postgres `{rows: [...]}` envelope I'd typed it as). Treated as array; container redeployed; Sentry stopped capturing new instances of either issue.
+- **R2 CORS:** the bucket `esharevice-images` had no CORS configuration, so `cdn.esharevice.com` served images without `Access-Control-Allow-Origin`. Set a rule allowing GET/HEAD from `esharevice.com`, `www.esharevice.com`, `app.esharevice.com`, `localhost:3000/3001`, `127.0.0.1:3000` via `PUT /accounts/.../r2/buckets/esharevice-images/cors`. Verified `Access-Control-Allow-Origin: https://esharevice.com` on preflight.
+- **New bug-registry entries (counter 43 → 47):**
+  - `[Type] Drizzle sql\`= ANY(${jsArray}::uuid[])\` renders a record, not an array`
+  - `[Type] Raw Date in Drizzle sql\`…\` template hits postgres-js byteLength`
+  - `[Type] db.execute(sql\`…\`) result shape differs by driver`
+  - `[Build] docker buildx --push can re-tag cached manifests instead of rebuilding`
+- **Follow-up still owed:** vitest integration test for `/v1/conversations` to lock in the fix. The two existing tests cover sharp-pipeline + idempotency + reserve-race; conversations has zero coverage. The integration test can run against the same Postgres service container CI already brings up.
+
 ### 2026-05-16 08:00 UTC — Lighthouse audit pass (100/100/100/100)
 
 Production `https://esharevice.com/` mobile audit went from 86 / 92 / 96 / 100 to **100 / 100 / 100 / 100** across Performance / Accessibility / Best Practices / SEO. Full audit: [docs/features/2026-05-16_lighthouse-audit.md](../docs/features/2026-05-16_lighthouse-audit.md).

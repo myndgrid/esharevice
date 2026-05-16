@@ -183,3 +183,31 @@ Internal docker network (no internet egress for datastores):
 - **Roll:** `docker compose pull web && up -d --force-recreate web`. Ready in 360 ms.
 - **Live verification:** `POST https://app.esharevice.com/api/auth/logout` (no cookies) now returns `303` with `Location: https://app.esharevice.com/`. `GET` still 405. End-to-end logout from a logged-in browser should now follow `POST /api/auth/logout` → `303` → `GET auth.esharevice.com/.../end-session/?...` → Authentik clears SSO cookie → `302` to `post_logout_redirect_uri=https://app.esharevice.com/` → home renders unauth.
 - **Captured pattern:** Bug-registry entry `[Network] POST → 307 Redirect Preserves Method, Trips Django/Authentik CSRF With 403` added in the same commit. Use 303 for any POST → cross-origin GET handoff.
+
+### 2026-05-16 01:52 UTC — Root-domain cutover: app.esharevice.com → esharevice.com
+
+The web app moves from `https://app.esharevice.com` to the root domain `https://esharevice.com`. The `app.*` and `www.*` hostnames stay provisioned and 301-redirect to root.
+
+- **Commit:** `09d19d3 feat(infra): serve app at root domain, 301 from app.* and www.*`.
+- **What changed:**
+  - `infra/Caddyfile` — `{$DOMAIN}` block now reverse-proxies to web; `www.{$DOMAIN}, app.{$DOMAIN}` share a 301-to-root block.
+  - `infra/docker-compose.yml` — `OIDC_REDIRECT_URI` and `WEB_ORIGIN` now point at `https://${DOMAIN}` instead of `https://app.${DOMAIN}`.
+  - `infra/authentik/blueprints/esharevice.yaml` — redirect_uris now lists root + app (legacy) + localhost; meta_launch_url → root.
+  - Docs: `README.md`, `docs/features/2026-05-14_web-oidc-login-flow.md`, `docs/features/2026-05-13_v1-api-surface.md` updated.
+- **Execution order (deliberately additive to avoid a redirect-uri-mismatch lockout):**
+  1. **PATCHed Authentik provider via admin API** (using `authentik_token` from `.env.creds`) to ADD `https://esharevice.com/api/auth/callback` to the `e-sharevice-web` OAuth2 provider — alongside the existing `https://app.esharevice.com/api/auth/callback`. This made the new URI live BEFORE any Caddy / env changes hit traffic.
+  2. Committed + pushed the repo changes.
+  3. `git pull` on the VPS — hit a local-edit conflict on `infra/authentik/blueprints/esharevice.yaml` (a manual hotfix from earlier weeks that pre-added the `offline_access` scope mapping, now in main). Stashed it, pulled cleanly, confirmed the stash content was a duplicate of HEAD, dropped the stash.
+  4. `docker compose exec caddy caddy validate && reload` + `up -d --force-recreate api web`.
+  5. **External curl test exposed that Caddy was still serving the OLD config** even though the on-disk Caddyfile was new. Root cause: `docker compose` single-file bind mounts pin to the file's inode at mount time; `git pull` unlinks + creates the file with a new inode, so the container kept reading the old file. Fix: `docker compose up -d --force-recreate caddy` to re-resolve the bind mount.
+- **Live verification:**
+  - `HEAD https://esharevice.com/` → `200` (Caddy proxies to web).
+  - `HEAD https://app.esharevice.com/` → `301 Location: https://esharevice.com/`.
+  - `HEAD https://www.esharevice.com/foo/bar` → `301 Location: https://esharevice.com/foo/bar` (path preserved).
+  - `POST /api/auth/logout` → `303 Location: https://esharevice.com/`.
+  - `GET /api/auth/login` → `307 Location: https://auth.esharevice.com/application/o/authorize/?...&redirect_uri=https%3A%2F%2Fesharevice.com%2Fapi%2Fauth%2Fcallback...&client_id=e-sharevice-web`.
+- **Captured patterns (bug registry):**
+  - `[Build] Docker Single-File Bind Mount Pins to Inode — git pull Silently Breaks It` — symptom is sneaky because every validate/reload claims success; only external traffic exposes staleness. Fix: `--force-recreate` after any `git pull` that touches a single-file mount.
+- **Follow-ups (not blocking):**
+  - The legacy `https://app.esharevice.com/api/auth/callback` is still in Authentik's redirect_uris allowlist. Safe to remove after a few days once no traffic originates from the old hostname; the blueprint already includes it for now so an Authentik restart doesn't drop it.
+  - Cookies on `app.esharevice.com` are host-scoped and will orphan-expire on existing browsers within 30 days (session) or ~15 minutes (access). Active users will re-login at the root domain on next visit. No mitigation needed.

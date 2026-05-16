@@ -1000,6 +1000,18 @@ These are isolated, reversible, low-risk fixes that don't require the new stack:
 
 ## Progress Log
 
+### 2026-05-16 01:52 UTC — Root-domain cutover
+
+The live web app moves from `https://app.esharevice.com` to `https://esharevice.com`. The legacy `app.*` and `www.*` hostnames 301-redirect to root (cert stays provisioned so the redirect itself completes cleanly). Authentik's `e-sharevice-web` provider was updated additively first (new URI added alongside the old) to avoid a redirect-uri-mismatch lockout; Caddy + compose env then flipped. Full detail and a new bug-registry entry (`[Build] Docker Single-File Bind Mount Pins to Inode — git pull Silently Breaks It`) are in [tasks/2026-05-16_root-domain-cutover.md](2026-05-16_root-domain-cutover.md). README, both feature docs, and the VPS deployment log are in sync with the new URL.
+
+### 2026-05-15 23:55 UTC — Week-5-first-slice hotfix pair
+
+Two security/correctness fixes on the logout flow shipped same-day:
+1. **`[Security] Prefetched GET on a State-Clearing Route Silently Logs Users Out`** — `<Link href="/api/auth/logout">` in `/profile` was being auto-prefetched by Next 15, applying the handler's cookie-clearing `Set-Cookie` headers without a user click. Fix: route handler is now `POST` only; `/profile` uses `<form method="post">`; the Sign-in link gets `prefetch={false}` as defense-in-depth. See [tasks/2026-05-15_logout-prefetch-silent-signout-fix.md](2026-05-15_logout-prefetch-silent-signout-fix.md).
+2. **`[Network] POST → 307 Redirect Preserves Method, Trips Django/Authentik CSRF With 403`** — surfaced by (1). `NextResponse.redirect()` defaults to 307, which preserves the POST method; the browser then POSTed Authentik's `/end-session` and tripped Django's CSRF middleware. Fix: pass `303` to `NextResponse.redirect`, which forces GET on follow per the canonical OIDC RP-Initiated Logout flow.
+
+Both deployed live to `ghcr.io/myndgrid/esharevice-web:latest`; digests in the deployment log. Bug-registry entries added.
+
 ### 2026-05-11 00:00 UTC
 - Plan drafted; saved for user review. No code changes yet.
 

@@ -907,6 +907,12 @@ Categories: `[Logic]` `[Null]` `[Memory]` `[Concurrency]` `[Type]` `[Network]` `
 
 ---
 
+### [Build] Docker Single-File Bind Mount Pins to Inode — `git pull` Silently Breaks It
+**Description:** `docker compose` bind-mounting a SINGLE FILE (not a directory) — e.g. `./Caddyfile:/etc/caddy/Caddyfile:ro` — resolves to the file's inode at mount time. When a tool like `git pull` (or `git checkout`, `git stash pop`, any "unlink + create" sequence) replaces the file, the **new file gets a new inode**; the container's bind mount keeps pointing at the now-orphaned old inode. Net effect: the host shows the new content (`cat` on the host is fine), but inside the container `cat /etc/caddy/Caddyfile` shows the old content, AND `caddy reload` re-reads the old content — so the running config never updates even though every command claims success.
+**Avoid:** After any `git pull` (or similar inode-changing edit) on the host, **recreate the consuming container**: `docker compose up -d --force-recreate <svc>`. The reload-without-recreate pattern only works for in-place edits (sed -i, manual editor save). Alternatively: bind-mount the parent directory and reference the file inside (`./caddy:/etc/caddy:ro`), since directory mounts follow the path rather than the inode. Symptom is sneaky: the validate succeeds, the reload command reports success, every observability surface lies — only an external curl against the running service exposes the staleness.
+
+---
+
 ### [Network] POST → 307 Redirect Preserves Method, Trips Django/Authentik CSRF With 403
 **Description:** `NextResponse.redirect(url)` in Next 15 defaults to **HTTP 307**, which preserves the request method on the redirect. If you POST to a Next route handler that redirects to a cross-origin Django-based service (Authentik, any DRF API), the browser POSTs the redirected URL. Django's CSRF middleware requires a CSRF token on every unsafe cross-origin POST — without one, you get `403 Forbidden — CSRF verification failed. Request aborted.` The error reads like an auth misconfiguration but is purely a method-preservation issue on the redirect.
 **Avoid:** When you need a browser to switch from POST to GET on a redirect (the canonical OIDC RP-Initiated Logout flow, redirect-after-POST, any cross-origin handoff), explicitly pass `303` to `NextResponse.redirect(url, 303)`. 303 ("See Other") is the only redirect status that the HTTP spec *requires* the browser to follow with GET regardless of the original method. 301/302 are "may convert to GET" (most browsers do, but per spec they shouldn't), 307/308 must preserve. Default to 303 for any POST → cross-origin GET handoff and you'll never debug a phantom CSRF error.
@@ -1221,4 +1227,4 @@ node -e "const wtf = require('wtfnode'); setTimeout(wtf.dump, 5000);"
 
 ---
 
-*Last updated: 2026-05-15 23:55 UTC | Global SWE Agent Config | Adapt the Architecture and Project Structure sections per project — everything else applies universally. Bug registry: 39 entries (+2 from the week-5 logout-prefetch incident — the GET-prefetch bug and the 307→303 CSRF cascade it uncovered).*
+*Last updated: 2026-05-16 01:52 UTC | Global SWE Agent Config | Adapt the Architecture and Project Structure sections per project — everything else applies universally. Bug registry: 40 entries (+1 from the 2026-05-16 root-domain cutover: Docker single-file bind mounts pin to inode and silently break on `git pull`).*

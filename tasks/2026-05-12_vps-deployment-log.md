@@ -264,3 +264,20 @@ Two commits, two pre-built linux/amd64 images, one rolling recreate of api + web
   - Saved feature (needs `exchange_item_saves` table + `/v1/saves` CRUD + a bookmark toggle on the detail page)
   - Messages feature (needs `conversations` + `messages` tables + SSE through Caddy)
   - These are documented as "Coming soon" on the stub pages.
+
+### 2026-05-16 04:10 UTC — Saved items shipped + reserve-race vitest
+
+Two-thread deploy: integration test that locks in the reserve race-safety invariant, plus the full Saved feature (DB → API → web).
+
+- **Commits:** `b6b93f4 test(api): integration test for the reserve-race invariant` + `bb7f832 feat(api): saves endpoints + exchange_item_saves table` (web slice landed in the same commit chain).
+- **Schema migration:** `packages/db/drizzle/0001_0001_exchange_item_saves.sql` applied to the live `esharevice-postgres-1` container via `docker exec -i psql < …`. Composite PK on `(user_id, item_id)` + reverse index `(user_id, created_at DESC)`. Both FKs `ON DELETE CASCADE`.
+- **Images:** `ghcr.io/myndgrid/esharevice-api:latest` + `:bb7f832`, digest `sha256:bec5bb794c1708bc50daf9c32d4835c42970b15fe563c4992045368d776824ae`; `ghcr.io/myndgrid/esharevice-web:latest` + `:bb7f832`, digest `sha256:decc61c12f2d0ef836e2864c02ae5b0ad531fcf2d4e767c4a647e710a73be355`.
+- **Roll:** parallel buildx + push; `docker compose up -d --force-recreate api web` from `/opt/esharevice/infra`. Both healthy in <12 s.
+- **Live verification (all green):**
+  - `/v1/health` 200; `/v1/saves` 401 (auth gate fires before everything); `GET/PUT/DELETE /v1/exchange-items/<id>/save` all 401 unauthed.
+  - `/v1/openapi.json` now advertises `/v1/exchange-items/{id}/save` + `/v1/saves` paths.
+  - `https://esharevice.com/saved` 307 → `/api/auth/login?return_to=%2Fsaved` (auth gate).
+- **Test coverage:**
+  - `apps/api/tests/reserve-race.test.ts` — runs two concurrent UPDATEs at the same row, asserts exactly one returns a row (the other's WHERE clause re-evaluates `reserved=true` after the first commits → zero rows → 409 from the handler). Skips gracefully when `DATABASE_URL` is the unit-test placeholder so CI without datastores stays green.
+  - Total vitest cases: 11 (10 unit + 1 integration).
+- **No new bug-registry entries.** Slice was clean across both API + web.

@@ -1000,6 +1000,10 @@ These are isolated, reversible, low-risk fixes that don't require the new stack:
 
 ## Progress Log
 
+### 2026-05-16 04:10 UTC — Saved items + reserve-race vitest
+
+Saved-items feature shipped end-to-end: new `exchange_item_saves` table (composite PK, both FKs cascade), four new `/v1` endpoints (GET save-state / PUT save / DELETE unsave / GET saves listing), idempotency middleware on the writes, optimistic-UI bookmark button on the detail page, populated `/saved` listing on the web. Plus a vitest integration test that proves the reserve-race invariant — two concurrent UPDATEs against the same row, exactly one wins — which skips gracefully in CI without a live DB. Full doc: [docs/features/2026-05-16_saved-items.md](../docs/features/2026-05-16_saved-items.md).
+
 ### 2026-05-16 03:55 UTC — Week-5 mobile polish + Sign-up CTA
 
 Mobile bottom tab bar (Home / Saved / Messages / Profile) lands per the original Phase-3 design spec — fixed bottom, `md:hidden`, safe-area-inset for iOS, 56 px tall with inline SVG icons (no new dep). Header gains a "Sign up" button alongside "Sign in" when unauthenticated; the `/api/auth/login?signup=1` route now forwards `prompt=create` to Authentik so the user lands on the registration screen instead of login. Stub pages for `/saved` and `/messages` with `requireAuth` and "Coming soon" copy so the tab bar resolves cleanly today; the underlying features (saves table + saves CRUD, conversations + messages + SSE) land in later slices. Full doc: [docs/features/2026-05-16_mobile-tab-bar-and-signup.md](../docs/features/2026-05-16_mobile-tab-bar-and-signup.md).

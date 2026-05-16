@@ -62,6 +62,10 @@ export const exchangeItems = pgTable(
     reserved: boolean("reserved").notNull().default(false),
     reserved_by: uuid("reserved_by").references(() => users.id, { onDelete: "set null" }),
     reserved_at: timestamp("reserved_at", { withTimezone: true }),
+    // Soft delete — NULL = active listing, non-NULL = archived. The 0002
+    // migration also adds a partial index on the active subset so
+    // `WHERE archived_at IS NULL` reads stay cheap as the archived tail grows.
+    archived_at: timestamp("archived_at", { withTimezone: true }),
     // Generated tsvector for FTS — finalized in a manual migration so weights stick.
     search: tsvector("search"),
     created_at: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

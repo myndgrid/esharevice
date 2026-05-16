@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import { Suspense } from "react";
 import { Header } from "../components/header";
 import { MobileTabBar } from "../components/mobile-tab-bar";
+import { MobileTabBarServer } from "../components/mobile-tab-bar-server";
 import "./globals.css";
 
 // Force dynamic rendering site-wide. The auth-aware <Header> reads cookies()
@@ -54,7 +55,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Header />
         </Suspense>
         {children}
-        <MobileTabBar />
+        <Suspense fallback={<MobileTabBar />}>
+          <MobileTabBarServer />
+        </Suspense>
       </body>
     </html>
   );

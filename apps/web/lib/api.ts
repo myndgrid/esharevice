@@ -7,6 +7,7 @@ import {
   Message,
   MessageCreate,
   SaveState,
+  UnreadCount,
   UserPublic,
 } from "@esharevice/shared";
 import { z } from "zod";
@@ -247,6 +248,9 @@ export const api = {
     if (idempotencyKey) opts.idempotencyKey = idempotencyKey;
     return call(`/v1/conversations/${conversationId}/messages`, Message, opts);
   },
+
+  unreadMessageCount: () =>
+    call("/v1/conversations/unread-count", UnreadCount, { authed: true, revalidate: false }),
 
   // Mark-read is fire-and-forget on the client side — the response body
   // is empty (204) and the call's only purpose is bumping the

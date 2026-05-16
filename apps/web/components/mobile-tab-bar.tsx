@@ -11,16 +11,24 @@ type Tab = {
   // A tab is "active" if the current pathname starts with this prefix.
   // The home tab matches `/` exactly to avoid catching every page.
   exact?: boolean;
+  // When set, the count appears as a badge on the tab. 0 or undefined
+  // hides the badge entirely so unread state and "no state yet" look
+  // identical (which is what we want).
+  badgeKey?: "messages";
 };
 
 const TABS: readonly Tab[] = [
   { href: "/", label: "Home", icon: <HomeIcon />, exact: true },
   { href: "/saved", label: "Saved", icon: <BookmarkIcon /> },
-  { href: "/messages", label: "Messages", icon: <ChatIcon /> },
+  { href: "/messages", label: "Messages", icon: <ChatIcon />, badgeKey: "messages" },
   { href: "/profile", label: "Profile", icon: <UserIcon /> },
 ] as const;
 
-export function MobileTabBar(): React.ReactElement {
+export function MobileTabBar({
+  unreadMessages = 0,
+}: {
+  unreadMessages?: number;
+} = {}): React.ReactElement {
   const pathname = usePathname();
 
   return (
@@ -34,6 +42,7 @@ export function MobileTabBar(): React.ReactElement {
       <ul className="mx-auto flex max-w-md items-stretch justify-around">
         {TABS.map((tab) => {
           const active = tab.exact ? pathname === tab.href : pathname.startsWith(tab.href);
+          const badgeCount = tab.badgeKey === "messages" ? unreadMessages : 0;
           return (
             <li key={tab.href} className="flex-1">
               <Link
@@ -45,16 +54,39 @@ export function MobileTabBar(): React.ReactElement {
                   (active ? "text-accent" : "text-fg-muted hover:text-fg")
                 }
               >
-                <span aria-hidden className="grid place-items-center">
+                <span aria-hidden className="relative grid place-items-center">
                   {tab.icon}
+                  {badgeCount > 0 && <UnreadBadge count={badgeCount} />}
                 </span>
-                <span className="text-[10px] font-medium leading-none">{tab.label}</span>
+                <span className="text-[10px] font-medium leading-none">
+                  {tab.label}
+                  {badgeCount > 0 && (
+                    <span className="sr-only">
+                      {" "}
+                      ({badgeCount} unread {badgeCount === 1 ? "message" : "messages"})
+                    </span>
+                  )}
+                </span>
               </Link>
             </li>
           );
         })}
       </ul>
     </nav>
+  );
+}
+
+function UnreadBadge({ count }: { count: number }): React.ReactElement {
+  // Cap at 9+ — the badge has to fit alongside the icon without breaking
+  // the tab's 12 px exclusive-zone budget around the icon.
+  const label = count > 9 ? "9+" : String(count);
+  return (
+    <span
+      aria-hidden
+      className="absolute -right-2 -top-1 inline-flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-red-600 px-1 text-[9px] font-semibold leading-none text-white"
+    >
+      {label}
+    </span>
   );
 }
 

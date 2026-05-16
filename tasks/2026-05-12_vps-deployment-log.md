@@ -217,4 +217,18 @@ The web app moves from `https://app.esharevice.com` to the root domain `https://
 - **What changed:** five R2-related env vars appended to `/opt/esharevice/infra/.env` on the VPS — `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET=esharevice-images`, `CDN_BASE_URL=https://cdn.esharevice.com`. S3-compatible API keys were created in the Cloudflare R2 dashboard (Object Read & Write, scoped to a single bucket); `cdn.esharevice.com` was bound as a custom domain via the dashboard, SSL active, ownership active.
 - **Roll:** `docker compose up -d --force-recreate api`. Healthy in <1 s.
 - **Live verification:** PUT + GET via the S3 SDK against `esharevice-images` worked (probe object 33 bytes, fetched back byte-for-byte). Same object fetched via `https://cdn.esharevice.com/probe/r2-credentials-test.txt` → 200. Probe object deleted afterwards. `POST /v1/exchange-items/{id}/image` still 401s without auth (the auth gate fires before the configuration check); the `503 Image storage is not configured yet` branch is now unreachable.
-- **Captured pattern:** the user provided the R2 keys with literal spaces in the variable NAMES (`cloudflare_Access Key ID=...`) inside `.env.creds`. Shell sourcing chokes on spaces in var names; we extract with `grep | cut` instead. Cosmetic for now — flagging in case we later automate `.env.creds` loading.
+- **Captured pattern:** the user provided the R2 keys with literal spaces in the variable NAMES (`cloudflare_Access Key ID=...`) inside `.env.creds`. Shell sourcing chokes on spaces in var names; we extract with `grep | cut` instead. Cosmetic for now — flagging in case we later automate `.env.creds` loading. (User has since normalized to `cloudflare_r2_access_key_id` etc.)
+
+### 2026-05-16 03:30 UTC — Web slice: /items/new + /items/[id] live
+
+- **Commit:** `e90c378 feat(web): /items/new create flow + /items/[id] detail page (week 5 cont.)`.
+- **Image:** `ghcr.io/myndgrid/esharevice-web:latest` + `:e90c378`, digest `sha256:c57236cf376170ce0af1689228aaacbb17dad5e8f3fe14159235f2e898c229b7`.
+- **Roll:** `docker compose up -d --force-recreate web`. Ready in 406 ms.
+- **What's now reachable in the browser:**
+  - `GET /items/new` — requireAuth gate (307 → `/api/auth/login?return_to=%2Fitems%2Fnew` for anonymous users); form + image picker for authed users.
+  - `GET /items/[id]` — 404 on missing UUID; 200 with detail card + 1600w image variant on hit.
+  - Home-page cards now link to `/items/[id]` and display the 800w variant inline.
+  - Header gains a "+ New" button when the session is present.
+- **End-to-end flow:** logged-in user → submit → server action POSTs `/v1/exchange-items` (with client-mounted Idempotency-Key) → POSTs `/v1/exchange-items/{id}/image` (multipart) → sharp pipeline generates 3 webp variants → R2 PUT → row's `img_key` updated → redirect to `/items/{id}` → detail page fetches via cdn.esharevice.com. Image upload failure leaves the row in place and redirects with `?image_error=<reason>` for graceful recovery.
+- **External verification:** `/` 200; `/items/new` 307 → login with `return_to=/items/new`; `/items/<uuid>` 404 on missing.
+- **Captured pattern:** the recent prefetch-of-state-clearing-GET fix carried forward — the "+ New" `<Link>` is a normal idempotent GET (no Set-Cookie) so prefetch is safe; logout still uses a `<form method="post">`; Sign-in still has `prefetch={false}` as defense-in-depth.

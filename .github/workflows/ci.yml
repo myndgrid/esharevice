@@ -12,6 +12,34 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    # Postgres service container so the integration test (reserve-race) actually
+    # runs instead of skipping. Mirrors the local dev setup — same user/pass/db,
+    # same Drizzle migrations applied via a setup step below.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: esharevice
+          POSTGRES_USER: esharevice
+          POSTGRES_PASSWORD: esharevice
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U esharevice -d esharevice"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=10
+
+    env:
+      # Placeholder values for the Zod env validator at module-load time.
+      # The unit tests mock out R2 + Redis so no real connections happen;
+      # the integration test uses DATABASE_URL (set further below) to hit
+      # the Postgres service container.
+      OIDC_ISSUER: https://auth.example/
+      OIDC_AUDIENCE: e-sharevice-web
+      OIDC_JWKS_URL: https://auth.example/jwks/
+
     steps:
       - uses: actions/checkout@v4
 
@@ -32,3 +60,31 @@ jobs:
 
       - name: Lint
         run: pnpm lint
+
+      # Wait for Postgres + apply schema. Extensions first (citext / pgcrypto),
+      # then each Drizzle migration in order. `psql -v ON_ERROR_STOP=1` so a
+      # broken SQL file fails the job loudly rather than producing a half-set-up
+      # schema and confusing test failures downstream.
+      - name: Apply DB migrations
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: esharevice
+          PGPASSWORD: esharevice
+          PGDATABASE: esharevice
+        run: |
+          set -euo pipefail
+          for try in 1 2 3 4 5; do
+            if psql -c 'select 1' >/dev/null 2>&1; then break; fi
+            echo "waiting for postgres ($try/5)..."; sleep 2
+          done
+          psql -v ON_ERROR_STOP=1 -f infra/postgres/init/01-extensions.sql
+          for f in packages/db/drizzle/*.sql; do
+            echo "applying $f"
+            psql -v ON_ERROR_STOP=1 -f "$f"
+          done
+
+      - name: Test
+        env:
+          DATABASE_URL: postgresql://esharevice:esharevice@localhost:5432/esharevice
+        run: pnpm test

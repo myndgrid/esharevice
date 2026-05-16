@@ -1,0 +1,41 @@
+# Active social-OAuth sources blueprint.
+#
+# Currently: Google only.
+# To add another provider (GitHub, Apple, Discord, etc.) copy the structure
+# below and update slug + provider_type + env-var names. See the side-by-side
+# Google + GitHub example in `social.yaml.template`.
+#
+# Activates automatically — this dir is mounted into both authentik-server
+# and authentik-worker via docker-compose.yml. After editing this file or
+# adding env vars to infra/.env, run:
+#   docker compose up -d --force-recreate authentik-server authentik-worker
+#
+# Authentik's `!Env` tag resolves at apply time. If the env var resolves to
+# an empty string, the blueprint apply fails — keep social entries scoped to
+# providers whose credentials are actually populated in infra/.env.
+
+version: 1
+metadata:
+  name: e-Sharevice social OAuth sources
+
+entries:
+  - model: authentik_sources_oauth.oauthsource
+    identifiers:
+      slug: google
+    attrs:
+      name: Google
+      enabled: true
+      provider_type: google
+      authentication_flow: !Find [
+        authentik_flows.flow,
+        [slug, default-source-authentication]
+      ]
+      enrollment_flow: !Find [
+        authentik_flows.flow,
+        [slug, default-source-enrollment]
+      ]
+      consumer_key: !Env GOOGLE_OAUTH_CLIENT_ID
+      consumer_secret: !Env GOOGLE_OAUTH_CLIENT_SECRET
+      # email_link: returning user with the same email signed up via password
+      # earlier gets linked to that existing account, NOT a new one.
+      user_matching_mode: email_link

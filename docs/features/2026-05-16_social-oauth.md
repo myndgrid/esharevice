@@ -1,20 +1,21 @@
 # Feature: Social OAuth (Google + GitHub) via Authentik
 
 **Created:** 2026-05-16 04:35 UTC
-**Last Updated:** 2026-05-16 04:35 UTC
-**Status:** Scaffolding shipped (blueprint template + env wiring + compose). Activation requires ~20 min of dashboard work — creating the OAuth apps in Google Cloud Console + GitHub, pasting client IDs/secrets into `infra/.env`, and renaming the template to `social.yaml`.
+**Last Updated:** 2026-05-16 05:00 UTC
+**Status:** **Google live** at `https://auth.esharevice.com`. GitHub deliberately deferred — the side-by-side template (`social.yaml.template`) keeps it as a copy-pasteable reference if it's wanted later.
 
-Once activated, the existing Authentik login screen at `https://auth.esharevice.com` gains "Sign in with Google" + "Sign in with GitHub" buttons. New users go through Authentik's default enrollment flow on first social sign-in (no separate signup form needed); returning users with the same email get matched to their existing account.
+Once activated, the Authentik login screen gains a "Sign in with Google" button. New users go through Authentik's default enrollment flow on first Google sign-in (no separate signup form needed); returning users with the same email get matched to their existing account via `user_matching_mode: email_link`.
 
 ## Overview
 
 This is end-to-end an Authentik feature. Our app's OIDC client config doesn't change — Authentik continues to be the issuer; we continue to verify its JWTs against the same JWKS. The only thing changing is *how* a user authenticates to Authentik (password ↔ social).
 
-The repo ships scaffolding that lights up automatically once the user does the manual external steps:
+The repo ships:
 
-- **Blueprint template** — [infra/authentik/blueprints/social.yaml.template](../../infra/authentik/blueprints/social.yaml.template). Lists `Google` + `GitHub` OAuth Sources tied to Authentik's default enrollment / authentication flows. `consumer_key` + `consumer_secret` read from env via Authentik's `!Env` YAML tag.
+- **Live blueprint** — [infra/authentik/blueprints/social.yaml](../../infra/authentik/blueprints/social.yaml). One `Google` OAuth Source tied to Authentik's default enrollment + authentication flows. `consumer_key/secret` read via Authentik's `!Env` tag.
+- **Reference template** — [infra/authentik/blueprints/social.yaml.template](../../infra/authentik/blueprints/social.yaml.template). Side-by-side Google + GitHub example for when a future maintainer wants to add another provider.
 - **Compose env wiring** — [infra/docker-compose.yml](../../infra/docker-compose.yml) threads `GOOGLE_OAUTH_CLIENT_ID/SECRET` + `GITHUB_OAUTH_CLIENT_ID/SECRET` into both `authentik-server` + `authentik-worker` with empty defaults. Worker is the one that actually applies blueprints, so it needs the env too.
-- **Env documentation** — [infra/.env.example](../../infra/.env.example) documents the variables + the URLs to register with Google / GitHub.
+- **Env documentation** — [infra/.env.example](../../infra/.env.example) documents the variables + the URLs to register.
 
 ## Setup procedure (user task, ~20 min total)
 
@@ -29,33 +30,24 @@ The repo ships scaffolding that lights up automatically once the user does the m
    - Authorized redirect URIs: `https://auth.esharevice.com/source/oauth/callback/google/`
 5. Save the **Client ID** + **Client secret** that pop up after creation.
 
-### 2. Create the GitHub OAuth app
+### 2. (Optional) Add GitHub later
 
-1. Open [GitHub → Settings → Developer settings → OAuth Apps → New OAuth App](https://github.com/settings/developers).
-2. Fill in:
-   - Application name: `e-Sharevice`
-   - Homepage URL: `https://esharevice.com`
-   - Authorization callback URL: `https://auth.esharevice.com/source/oauth/callback/github/`
-3. Save. Then **Generate a new client secret** and copy it (shown ONCE — paste before you navigate away).
+Skipped on initial activation. To add GitHub OAuth, see [social.yaml.template](../../infra/authentik/blueprints/social.yaml.template) — copy the GitHub `oauthsource` entry into `social.yaml`, set `GITHUB_OAUTH_CLIENT_ID/SECRET` in `infra/.env`, register the callback `https://auth.esharevice.com/source/oauth/callback/github/` with the GitHub OAuth App, and recreate the Authentik containers.
 
-### 3. Paste the four secrets into `/opt/esharevice/infra/.env` on the VPS
+### 3. Paste the secrets into `/opt/esharevice/infra/.env` on the VPS
 
 ```dotenv
 GOOGLE_OAUTH_CLIENT_ID=<from-step-1>
 GOOGLE_OAUTH_CLIENT_SECRET=<from-step-1>
-GITHUB_OAUTH_CLIENT_ID=<from-step-2>
-GITHUB_OAUTH_CLIENT_SECRET=<from-step-2>
 ```
 
 ### 4. Activate the blueprint
 
-On the VPS:
+On the VPS (`social.yaml` is already in the repo — `git pull` makes it appear on disk):
 
 ```bash
-cd /opt/esharevice/infra/authentik/blueprints
-cp social.yaml.template social.yaml
-cd ../..
-docker compose up -d --force-recreate authentik-server authentik-worker
+cd /opt/esharevice && git pull
+cd infra && docker compose up -d --force-recreate authentik-server authentik-worker
 ```
 
 The worker reads `social.yaml` from `/blueprints/custom/` on boot and applies it. Apply succeeds when `!Env` references resolve to non-empty strings (so make sure step 3 was written + the .env was saved before this step).

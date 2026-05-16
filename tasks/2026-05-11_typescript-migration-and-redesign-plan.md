@@ -1000,6 +1000,14 @@ These are isolated, reversible, low-risk fixes that don't require the new stack:
 
 ## Progress Log
 
+### 2026-05-16 03:55 UTC — Week-5 mobile polish + Sign-up CTA
+
+Mobile bottom tab bar (Home / Saved / Messages / Profile) lands per the original Phase-3 design spec — fixed bottom, `md:hidden`, safe-area-inset for iOS, 56 px tall with inline SVG icons (no new dep). Header gains a "Sign up" button alongside "Sign in" when unauthenticated; the `/api/auth/login?signup=1` route now forwards `prompt=create` to Authentik so the user lands on the registration screen instead of login. Stub pages for `/saved` and `/messages` with `requireAuth` and "Coming soon" copy so the tab bar resolves cleanly today; the underlying features (saves table + saves CRUD, conversations + messages + SSE) land in later slices. Full doc: [docs/features/2026-05-16_mobile-tab-bar-and-signup.md](../docs/features/2026-05-16_mobile-tab-bar-and-signup.md).
+
+### 2026-05-16 03:35 UTC — Image-upload fix + race-safe reserve action
+
+End-to-end create-item-with-image now actually works in production after two layered bugs were fixed (a Next-15 server-action File backed by a one-shot stream + `@hono/zod-openapi` consuming the multipart body via its built-in validator). Reserve action shipped same deploy: server action wrapper + idempotent SQL UPDATE gated on `WHERE reserved = false` so two simultaneous reserve requests can never both win. Two bug-registry entries (counter 40 → 42); feature doc at [docs/features/2026-05-16_reserve-action.md](../docs/features/2026-05-16_reserve-action.md).
+
 ### 2026-05-16 02:20 UTC — Week 4 backend foundation (R2 + idempotency)
 
 The backend half of the image upload pipeline + the long-pending idempotency middleware. `POST /v1/exchange-items/:id/image` accepts multipart, content-hashes the upload, runs sharp through three webp variants (1600 / 800 / 400 widths), uploads to a content-keyed prefix on Cloudflare R2, updates the row's `img_key`. Idempotency middleware (Stripe-flavoured, Redis-backed, 24 h TTL, fingerprints body to detect key-reuse-with-different-payload) wired across every unsafe `/v1/exchange-items` route. 10 vitest tests green (R2 + Redis mocked). Bucket provisioned via the Cloudflare REST API; S3 access keys + `cdn.esharevice.com` custom domain remain as a ~2-minute Cloudflare dashboard step (the public API doesn't expose either of those — captured in the bug-registry). Until that's done the upload endpoint returns 503; the rest of the API is unaffected. Full detail in [tasks/2026-05-16_week-4-r2-image-upload-and-idempotency.md](2026-05-16_week-4-r2-image-upload-and-idempotency.md).

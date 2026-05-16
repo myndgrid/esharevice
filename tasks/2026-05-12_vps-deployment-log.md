@@ -250,3 +250,17 @@ Two commits, two pre-built linux/amd64 images, one rolling recreate of api + web
   - `[Build] Next 15 Server-Action File Is a One-Shot Stream` — the File from `formData.get(...)` is backed by a one-shot ReadableStream; can't be re-fetched. Materialise as a Buffer → fresh Blob with 3-arg `append`.
   - `[Build] @hono/zod-openapi Pre-Reads Multipart Bodies When You Declare request.body` — declaring `request.body` makes Hono validate (and consume) the multipart stream BEFORE the handler runs. Omit `body` from the route schema for upload endpoints; use `c.req.parseBody()` in the handler.
 - **Race-safety improvement:** `PUT /reserve` UPDATE now gated on `WHERE reserved = false` — two simultaneous reserve requests can no longer both win. The lost-race branch returns 409 with a useful message instead of silent corruption.
+
+### 2026-05-16 03:55 UTC — Mobile tab bar + Sign-up CTA + Saved/Messages stubs
+
+- **Commit:** `bc82aa8 feat(web): mobile tab bar + signup CTA + Saved/Messages stubs`.
+- **Image:** `ghcr.io/myndgrid/esharevice-web:latest` + `:bc82aa8`, digest `sha256:789ddd117c2c6f7bf59026e6eebd052c11aed0656823a97172288f7f28eb9dec`.
+- **Roll:** `docker compose up -d --force-recreate web` from `/opt/esharevice/infra`. Healthy in <1 s.
+- **Live verification (all green):**
+  - `/` 200, `/items/new` 307, `/saved` 307, `/messages` 307, `/profile` 307.
+  - `GET /api/auth/login?signup=1&return_to=/` → 307 → `https://auth.esharevice.com/.../authorize/?...&prompt=create&redirect_uri=https%3A%2F%2Fesharevice.com%2Fapi%2Fauth%2Fcallback...`. Authentik either renders the registration screen directly (if it honours `prompt=create`) or shows the login form with a "Sign up" link as fallback.
+- **No new bug-registry entries this round.** Slice was pure additive UI.
+- **Follow-ups not in this slice:**
+  - Saved feature (needs `exchange_item_saves` table + `/v1/saves` CRUD + a bookmark toggle on the detail page)
+  - Messages feature (needs `conversations` + `messages` tables + SSE through Caddy)
+  - These are documented as "Coming soon" on the stub pages.

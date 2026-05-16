@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 /**
- * Generate the PWA + Apple icon PNGs from the canonical SVG logo.
+ * Generate the PWA + Apple icon PNGs + the legacy multi-resolution
+ * favicon.ico from the canonical SVG logo.
  *
+ *   app/favicon.ico                — 16/32/48 PNG bundled in ICO (legacy
+ *                                    browsers + sites that hardcode /favicon.ico)
  *   public/icon-192.png            — Android home screen, install prompt
  *   public/icon-512.png            — Android splash, larger contexts
  *   public/icon-maskable-512.png   — Android adaptive icon (logo at 70% so it stays
@@ -16,9 +19,11 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import sharp from "sharp";
+import toIco from "to-ico";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const publicDir = resolve(here, "..", "public");
+const appDir = resolve(here, "..", "app");
 
 // Brand logo — two overlapping circles. Inlined so the script has no
 // runtime filesystem read of the SVG (avoids cwd issues + makes diffs
@@ -59,6 +64,35 @@ async function makeTile(size, logoScale, outPath) {
   console.log(`  wrote ${outPath} (${size}×${size}, logo ${Math.round(logoScale * 100)}%)`);
 }
 
+/**
+ * Generate the raw square-tile PNG bytes at a given size (no file write).
+ * Used by both the PWA-PNG flow and the favicon.ico assembly.
+ */
+async function renderTilePng(size, logoScale) {
+  const logoSize = Math.round(size * logoScale);
+  const logoPng = await sharp(Buffer.from(LOGO_SVG), { density: 1024 })
+    .resize({
+      width: logoSize,
+      height: logoSize,
+      fit: "contain",
+      background: { r: 255, g: 255, b: 255, alpha: 0 },
+    })
+    .png()
+    .toBuffer();
+
+  return sharp({
+    create: {
+      width: size,
+      height: size,
+      channels: 4,
+      background: { r: 255, g: 255, b: 255, alpha: 1 },
+    },
+  })
+    .composite([{ input: logoPng, gravity: "center" }])
+    .png()
+    .toBuffer();
+}
+
 async function main() {
   await mkdir(publicDir, { recursive: true });
   console.log("Generating PWA icons…");
@@ -66,6 +100,20 @@ async function main() {
   await makeTile(512, 0.8, resolve(publicDir, "icon-512.png"));
   await makeTile(512, 0.7, resolve(publicDir, "icon-maskable-512.png"));
   await makeTile(180, 0.8, resolve(publicDir, "apple-touch-icon.png"));
+
+  console.log("Generating favicon.ico…");
+  // Multi-resolution ICO so legacy clients (some Outlook/Office contexts,
+  // older Windows shell) get a crisp small icon, while modern browsers
+  // that ignore the ICO and use the SVG `icon.svg` get the vector.
+  const [px16, px32, px48] = await Promise.all([
+    renderTilePng(16, 0.9),
+    renderTilePng(32, 0.85),
+    renderTilePng(48, 0.85),
+  ]);
+  const ico = await toIco([px16, px32, px48]);
+  await writeFile(resolve(appDir, "favicon.ico"), ico);
+  console.log(`  wrote ${resolve(appDir, "favicon.ico")} (16/32/48 multi-res)`);
+
   console.log("Done.");
 }
 

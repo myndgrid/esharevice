@@ -1,7 +1,7 @@
 # VPS Deployment Log — e-Sharevice (esharevice.com on Hostinger)
 
 **Created:** 2026-05-12 22:00 UTC
-**Last Updated:** 2026-05-13 00:30 UTC
+**Last Updated:** 2026-05-16 14:27 UTC
 **Status:** Stack live; Authentik fully provisioned; typed Hono /v1 API serving real routes
 
 The runbook's prerequisites were sourced from `tasks/.env.creds` (gitignored). The user opted for the "fast path" (option B in the kickoff exchange): use the master credentials once for setup, rotate after. **All four credentials below MUST be rotated** before this is treated as production.
@@ -411,6 +411,7 @@ User reported "Internal server error (500)" on `/messages` shortly after the SSE
   - `[Type] db.execute(sql\`…\`) result shape differs by driver`
   - `[Build] docker buildx --push can re-tag cached manifests instead of rebuilding`
 - **Follow-up still owed:** vitest integration test for `/v1/conversations` to lock in the fix. The two existing tests cover sharp-pipeline + idempotency + reserve-race; conversations has zero coverage. The integration test can run against the same Postgres service container CI already brings up.
+- **Follow-up landed 2026-05-16 12:00 UTC:** `apps/api/tests/conversations.test.ts` — 3 tests mirror the route SQL verbatim (inArray for the `IN (…)` list, `sql.join` for the DISTINCT-ON cast, `.toISOString()` for the messages cursor). Runs against the same CI Postgres service container as reserve-race; skips cleanly when DATABASE_URL is the unit-test placeholder.
 
 ### 2026-05-16 08:00 UTC — Lighthouse audit pass (100/100/100/100)
 
@@ -420,3 +421,18 @@ Production `https://esharevice.com/` mobile audit went from 86 / 92 / 96 / 100 t
 - **Image:** `ghcr.io/myndgrid/esharevice-web:4ee7dba`. API image unchanged.
 - **Roll:** `docker compose up -d --force-recreate web`. Healthy in 6 s.
 - **Fixes:** 3 color tokens darkened for WCAG AA (`--accent` light + `--fg-subtle` light + dark); header auth buttons bumped to `size="md"` + `gap-3` for the 24×24 exclusive-zone rule; first 3 home cards eager-load with `fetchPriority="high"` (LCP 2.8 s → <1 s); `apps/web/app/icon.svg` added so `/favicon.ico` 200s instead of 404ing in the console.
+
+### 2026-05-16 14:27 UTC — Messages Phase B-2 (email-on-new-message + active-view suppression)
+
+- **What shipped:** end-to-end email notification when a thread participant sends a message AND the recipient hasn't been actively viewing the thread in the last 2 minutes. Two new columns on `conversations` (`initiator_last_read_at`, `owner_last_read_at`), one new endpoint (`PATCH /v1/conversations/{id}/read`), sender auto-mark-read on POST, recipient-side mark-read fired by the client on SSE open + every incoming live message.
+- **Migration:** `packages/db/drizzle/0004_0001_conversations_last_read.sql` — two nullable `timestamptz` columns. NULL means "never seen" → always emails (matches the intuitive "first message always notifies" expectation).
+- **Suppression rule:** `now() - recipient.last_read_at < 2 min` ⇒ skip email. The window is conservative — long enough that "I'm typing a reply" doesn't trigger a notification of my own reply, short enough that "I closed the tab a minute ago" still goes through.
+- **Resend path:** reuses the same fire-and-forget IIFE wrapping as the reserve-email + saver emails. Failures log + Sentry-capture; never throw out of the POST handler.
+- **Test coverage:** added a 4th case to `apps/api/tests/conversations.test.ts` asserting that updating one participant's `*_last_read_at` doesn't touch the other's — the suppression rule depends on the columns being independent.
+- **Deploy plan (next):** apply 0004 to live Postgres via `docker exec -i esharevice-postgres-1 psql ... < migration.sql`; build + push both images with `--no-cache-filter check`; `docker compose up -d --force-recreate api web`. No env changes needed (reuses `RESEND_API_KEY` + `EMAIL_FROM` + `WEB_ORIGIN`).
+- **Verification checklist after roll:**
+  - `curl -i https://api.esharevice.com/v1/health` → 200.
+  - `curl -i -X PATCH https://api.esharevice.com/v1/conversations/00000000-0000-0000-0000-000000000000/read` (no auth) → 401.
+  - Send a message from A → B (B not viewing): inbox should receive the new-message email within seconds.
+  - Send the second message from A → B (B viewing): inbox should NOT receive a duplicate.
+  - Sentry: no new issues on POST /messages or PATCH /:id/read.

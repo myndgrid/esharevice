@@ -1,7 +1,7 @@
 # Task: TypeScript Migration & Frontend Redesign Plan
 
 **Created:** 2026-05-11 00:00 UTC
-**Last Updated:** 2026-05-14 21:00 UTC
+**Last Updated:** 2026-05-16 14:27 UTC
 **Status:** v3.4 — weeks 1-3 shipped + first web slice live (OIDC login + design system + home/profile pages)
 
 ---
@@ -999,6 +999,10 @@ These are isolated, reversible, low-risk fixes that don't require the new stack:
 ---
 
 ## Progress Log
+
+### 2026-05-16 14:27 UTC — Messages Phase B-2: email-on-new-message
+
+Closes the last open thread on the Messages feature. Adds `initiator_last_read_at` + `owner_last_read_at` (timestamptz, nullable) to `conversations` via `0004_0001_conversations_last_read.sql`. `POST /v1/conversations/{id}/messages` now (a) bumps the sender's `*_last_read_at` along with `last_message_at` — preventing back-and-forth notification storms — and (b) fires a fire-and-forget Resend email to the recipient unless their `*_last_read_at` is within `ACTIVE_VIEW_WINDOW_MS = 2 min` of `now()`. New endpoint `PATCH /v1/conversations/{id}/read` lets the client mark-read without sending a message; the client wires it into the SSE `ready` handler + every incoming live message from a different sender, so an open thread keeps the read timestamp warm. Test coverage: added a 4th case to `apps/api/tests/conversations.test.ts` asserting the two `*_last_read_at` columns update independently. Typecheck + lint + all 15 vitest cases green. Reuses existing `RESEND_API_KEY` / `EMAIL_FROM` / `WEB_ORIGIN`; no new env.
 
 ### 2026-05-16 14:05 UTC — `/v1/conversations` 500-cascade + R2 CORS
 

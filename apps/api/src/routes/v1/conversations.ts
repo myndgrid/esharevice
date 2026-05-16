@@ -63,6 +63,7 @@ function toApiConversation(
   ownerId: string,
   otherPartyName: string,
   lastMessageBody: string | null,
+  unreadCount: number,
 ): z.infer<typeof ConversationSchema> {
   // Truncate the preview to keep the list payload small.
   const preview = lastMessageBody
@@ -80,6 +81,7 @@ function toApiConversation(
     last_message_preview: preview,
     last_message_at: conv.last_message_at.toISOString(),
     created_at: conv.created_at.toISOString(),
+    unread_count: unreadCount,
   });
 }
 
@@ -170,8 +172,10 @@ route.openapi(
       `${owner?.first_name ?? ""} ${owner?.last_name ?? ""}`.trim() || "Owner";
 
     const status = inserted[0] ? 201 : 200;
+    // Fresh thread: zero unread (initiator just created it; no messages yet
+    // and the API auto-bumps the sender's last_read_at on every message).
     return c.json(
-      toApiConversation(conv, item.service, item.user_id, otherPartyName, null),
+      toApiConversation(conv, item.service, item.user_id, otherPartyName, null, 0),
       status,
     );
   },
@@ -285,6 +289,32 @@ route.openapi(
       previewRows.map((r) => [r.conversation_id, r.body]),
     );
 
+    // Per-conversation unread count. Same SQL shape as the global
+    // /v1/conversations/unread-count endpoint, just scoped to this page's
+    // conversation IDs and grouped. Drives the per-thread badge on the list.
+    const unreadRows: { conversation_id: string; unread: number }[] =
+      convIds.length > 0
+        ? ((await db.execute(sql`
+            SELECT m.conversation_id, COUNT(*)::int AS unread
+            FROM ${messages} m
+            JOIN ${conversations} c ON c.id = m.conversation_id
+            WHERE m.conversation_id IN (${sql.join(
+              convIds.map((id) => sql`${id}::uuid`),
+              sql`, `,
+            )})
+              AND m.sender_id != ${u.id}::uuid
+              AND m.created_at > COALESCE(
+                CASE
+                  WHEN c.initiator_id = ${u.id}::uuid THEN c.initiator_last_read_at
+                  ELSE c.owner_last_read_at
+                END,
+                'epoch'::timestamptz
+              )
+            GROUP BY m.conversation_id
+          `)) as unknown as { conversation_id: string; unread: number }[])
+        : [];
+    const unreadByConv = new Map(unreadRows.map((r) => [r.conversation_id, r.unread]));
+
     const items = page.map((r) => {
       const otherId = r.conv.initiator_id === u.id ? r.owner_id : r.conv.initiator_id;
       const other = otherPartyById.get(otherId);
@@ -297,6 +327,7 @@ route.openapi(
         r.owner_id,
         otherName,
         previewByConv.get(r.conv.id) ?? null,
+        unreadByConv.get(r.conv.id) ?? 0,
       );
     });
 
@@ -419,8 +450,24 @@ route.openapi(
       `${other?.first_name ?? ""} ${other?.last_name ?? ""}`.trim() ||
       (row.conv.initiator_id === u.id ? "Owner" : "Member");
 
+    // Same unread-count rule as the list. The client marks-read on SSE
+    // open so this is effectively a snapshot at request time — useful for
+    // header chrome and for clients that haven't yet wired SSE.
+    const viewerLastRead =
+      row.conv.initiator_id === u.id
+        ? row.conv.initiator_last_read_at
+        : row.conv.owner_last_read_at;
+    const unreadRows = (await db.execute(sql`
+      SELECT COUNT(*)::int AS unread
+      FROM ${messages}
+      WHERE conversation_id = ${id}::uuid
+        AND sender_id != ${u.id}::uuid
+        AND created_at > ${(viewerLastRead ?? new Date(0)).toISOString()}::timestamptz
+    `)) as unknown as { unread: number }[];
+    const unread = unreadRows[0]?.unread ?? 0;
+
     return c.json(
-      toApiConversation(row.conv, row.item_service, row.owner_id, otherName, null),
+      toApiConversation(row.conv, row.item_service, row.owner_id, otherName, null, unread),
       200,
     );
   },

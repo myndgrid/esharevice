@@ -16,6 +16,8 @@ export const Conversation = z.object({
   last_message_preview: z.string().nullable(),
   last_message_at: z.string().datetime(),
   created_at: z.string().datetime(),
+  /** Messages newer than viewer's last_read_at AND not authored by viewer. */
+  unread_count: z.number().int().nonnegative(),
 });
 export type Conversation = z.infer<typeof Conversation>;
 

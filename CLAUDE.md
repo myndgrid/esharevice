@@ -932,6 +932,22 @@ Categories: `[Logic]` `[Null]` `[Memory]` `[Concurrency]` `[Type]` `[Network]` `
 
 ---
 
+### [Build] Authentik OAuth Source Doesn't Auto-Attach to the Login Screen
+**Description:** Creating an `oauthsource` blueprint entry registers the Source in Authentik, but the actual "Sign in with X" button on the login page does NOT appear automatically. Authentik's `default-authentication-identification` stage has an explicit `sources: ManyToMany` field that's empty by default — the stage renders only the sources listed there. So you can have a fully working Google/GitHub Source (the OAuth handshake works if hit directly at `/source/oauth/login/<slug>/`) and still get a vanilla email-or-username login form with zero social buttons. Verification: `GET /api/v3/sources/oauth/` shows the source exists, `GET /source/oauth/login/<slug>/` 302s to the IdP correctly, but the user-facing screen looks like nothing changed.
+**Avoid:** Whenever you add a new OAuthSource (or SAMLSource), ALSO update the identification stage's `sources` list. Blueprint form:
+```yaml
+- model: authentik_stages_identification.identificationstage
+  identifiers:
+    slug: default-authentication-identification
+  attrs:
+    sources:
+      - !Find [authentik_sources_oauth.oauthsource, [slug, google]]
+    show_source_labels: true
+```
+Without `show_source_labels: true` the button renders icon-only, which can be confusing for unbranded sources.
+
+---
+
 ### [Build] Next 15 Server-Action `File` Is a One-Shot Stream
 **Description:** Inside a Next 15 server action, `formData.get("name")` for a file input returns a `File` instance backed by a one-shot `ReadableStream`. If you re-append that `File` to a fresh `FormData` and hand it to `fetch()` to forward to another service, undici emits a malformed multipart body — the receiving server then 400s with something like `Body is unusable: Body has already been read` or `Body has already been read`. The browser sees only the downstream error and you spend an hour blaming the recipient.
 **Avoid:** Materialise the bytes before re-sending. Read once into an `ArrayBuffer`, wrap as a fresh `Blob`, and use the 3-arg `formData.append(name, blob, filename)` form so the multipart part has a `filename=` attribute. Pattern:
@@ -1252,4 +1268,4 @@ node -e "const wtf = require('wtfnode'); setTimeout(wtf.dump, 5000);"
 
 ---
 
-*Last updated: 2026-05-16 03:35 UTC | Global SWE Agent Config | Adapt the Architecture and Project Structure sections per project — everything else applies universally. Bug registry: 42 entries (+2 from the 2026-05-16 image-upload incident: server-action File is a one-shot stream, and `@hono/zod-openapi` `request.body` pre-reads multipart streams).*
+*Last updated: 2026-05-16 05:05 UTC | Global SWE Agent Config | Adapt the Architecture and Project Structure sections per project — everything else applies universally. Bug registry: 43 entries (+1 from the 2026-05-16 Google OAuth activation: Authentik OAuth source doesn't auto-attach to the login screen — you must also update the identification stage's `sources` list).*

@@ -12,7 +12,7 @@ This is end-to-end an Authentik feature. Our app's OIDC client config doesn't ch
 
 The repo ships:
 
-- **Live blueprint** — [infra/authentik/blueprints/social.yaml](../../infra/authentik/blueprints/social.yaml). One `Google` OAuth Source tied to Authentik's default enrollment + authentication flows. `consumer_key/secret` read via Authentik's `!Env` tag.
+- **Live blueprint** — [infra/authentik/blueprints/social.yaml](../../infra/authentik/blueprints/social.yaml). One `Google` OAuth Source tied to Authentik's default enrollment + authentication flows. `consumer_key/secret` read via Authentik's `!Env` tag. **Also patches the `default-authentication-identification` stage** to include the Google source — without this, the "Sign in with Google" button does NOT render on the login screen even though the OAuth handshake works (bug-registry entry covers this gotcha).
 - **Reference template** — [infra/authentik/blueprints/social.yaml.template](../../infra/authentik/blueprints/social.yaml.template). Side-by-side Google + GitHub example for when a future maintainer wants to add another provider.
 - **Compose env wiring** — [infra/docker-compose.yml](../../infra/docker-compose.yml) threads `GOOGLE_OAUTH_CLIENT_ID/SECRET` + `GITHUB_OAUTH_CLIENT_ID/SECRET` into both `authentik-server` + `authentik-worker` with empty defaults. Worker is the one that actually applies blueprints, so it needs the env too.
 - **Env documentation** — [infra/.env.example](../../infra/.env.example) documents the variables + the URLs to register.

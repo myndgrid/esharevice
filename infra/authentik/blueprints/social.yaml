@@ -39,3 +39,17 @@ entries:
       # email_link: returning user with the same email signed up via password
       # earlier gets linked to that existing account, NOT a new one.
       user_matching_mode: email_link
+
+  # Attach the Google source to the default identification stage so the
+  # "Sign in with Google" button actually renders on the login screen.
+  # Creating the OAuthSource alone isn't enough — Authentik's identification
+  # stage has an explicit `sources` ManyToMany; by default it's empty even
+  # if matching sources exist. show_source_labels makes the button render
+  # with a readable label ("Google") instead of just the icon.
+  - model: authentik_stages_identification.identificationstage
+    identifiers:
+      slug: default-authentication-identification
+    attrs:
+      sources:
+        - !Find [authentik_sources_oauth.oauthsource, [slug, google]]
+      show_source_labels: true

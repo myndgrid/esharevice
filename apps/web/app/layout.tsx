@@ -64,10 +64,25 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: themeBootstrap }} />
       </head>
       <body className="bg-bg text-fg pb-[calc(3.5rem+env(safe-area-inset-bottom))] md:pb-0">
+        {/*
+          Skip-to-content link — first focusable element on every page.
+          Hidden visually until it receives keyboard focus, at which point
+          it appears as a high-contrast pill at the top of the viewport.
+          Activating it programmatically focuses the main-content wrapper
+          (tabIndex={-1} makes it focusable without joining the tab order).
+        */}
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:border focus:border-accent focus:bg-bg focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-accent focus:shadow-lg"
+        >
+          Skip to content
+        </a>
         <Suspense fallback={<HeaderSkeleton />}>
           <Header />
         </Suspense>
-        {children}
+        <div id="main-content" tabIndex={-1} className="outline-none">
+          {children}
+        </div>
         <Suspense fallback={<MobileTabBar />}>
           <MobileTabBarServer />
         </Suspense>

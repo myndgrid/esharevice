@@ -48,11 +48,16 @@ export default async function SavedPage(): Promise<React.ReactElement> {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <ul
+          className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+          aria-label="Saved items"
+        >
           {items.map((item) => (
-            <SavedItemCard key={item.id} item={item} />
+            <li key={item.id}>
+              <SavedItemCard item={item} />
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </main>
   );

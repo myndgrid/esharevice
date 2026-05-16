@@ -42,16 +42,21 @@ export default async function HomePage(): Promise<React.ReactElement> {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <ul
+          className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+          aria-label="Exchange listings"
+        >
           {items.map((item, i) => (
             // First 3 cards are above the fold on most viewports — eager-load
             // their images + flag them as fetchPriority="high" so the browser
             // doesn't wait for layout to discover them. Lighthouse measures
             // LCP from the first painted hero card; lazy-loading made LCP
             // 2.8 s instead of <1.5 s.
-            <ExchangeItemCard key={item.id} item={item} priority={i < 3} />
+            <li key={item.id}>
+              <ExchangeItemCard item={item} priority={i < 3} />
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </main>
   );

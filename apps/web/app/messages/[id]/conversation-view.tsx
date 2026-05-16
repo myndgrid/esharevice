@@ -164,7 +164,16 @@ export function ConversationView({
             No messages yet. Say hello.
           </p>
         ) : (
-          <ul className="grid gap-2 px-2 pb-2">
+          // role="log" + aria-live="polite" so screen readers announce
+          // new messages as they arrive via SSE. "polite" (not "assertive")
+          // means announcements wait for any in-progress speech to finish,
+          // avoiding interrupting the user mid-read.
+          <ul
+            className="grid gap-2 px-2 pb-2"
+            role="log"
+            aria-live="polite"
+            aria-label="Conversation messages"
+          >
             {messages.map((m) => (
               <li
                 key={m.id}
@@ -201,7 +210,11 @@ export function ConversationView({
           </p>
         )}
         <div className="flex items-end gap-2">
+          <label htmlFor="conversation-body" className="sr-only">
+            Message
+          </label>
           <textarea
+            id="conversation-body"
             value={body}
             onChange={(e) => setBody(e.target.value.slice(0, MAX_BODY))}
             onKeyDown={(e) => {
@@ -216,8 +229,19 @@ export function ConversationView({
             maxLength={MAX_BODY}
             className="min-h-10 max-h-32 flex-1 resize-y rounded-md border border-border bg-bg-subtle px-3 py-2 text-sm text-fg placeholder:text-fg-subtle outline-none focus:border-accent focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-bg"
           />
-          <Button type="submit" variant="primary" size="sm" disabled={sending || body.trim().length === 0}>
-            {sending ? "…" : "Send"}
+          {/*
+            Keep the "Send" text stable across pending/idle so screen
+            readers don't hear "…" announced. aria-busy signals the
+            in-progress state instead.
+          */}
+          <Button
+            type="submit"
+            variant="primary"
+            size="sm"
+            disabled={sending || body.trim().length === 0}
+            aria-busy={sending}
+          >
+            Send
           </Button>
         </div>
       </form>

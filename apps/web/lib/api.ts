@@ -155,6 +155,16 @@ export const api = {
     return call(`/v1/exchange-items/${id}`, ExchangeItem, opts);
   },
 
+  deleteExchangeItem: async (id: string, idempotencyKey?: string): Promise<void> => {
+    // The API returns 204 No Content; the `call` wrapper expects to parse a
+    // schema for non-204 responses. Since this endpoint is always 204 on
+    // success, pass a placeholder z.void schema; `call` short-circuits to
+    // undefined when status === 204 before touching the schema.
+    const opts: Options = { method: "DELETE", authed: true, revalidate: false };
+    if (idempotencyKey) opts.idempotencyKey = idempotencyKey;
+    await call(`/v1/exchange-items/${id}`, z.void(), opts);
+  },
+
   uploadExchangeItemImage: (
     id: string,
     blob: Blob,

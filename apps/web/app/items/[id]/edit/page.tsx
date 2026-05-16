@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { Card, CardContent } from "@esharevice/ui";
 import { api, ApiError } from "../../../../lib/api";
 import { requireAuth } from "../../../../lib/auth";
+import { DeleteButton } from "./delete-button";
 import { EditItemForm } from "./edit-item-form";
 
 export const dynamic = "force-dynamic";
@@ -47,6 +48,19 @@ export default async function EditItemPage({ params }: Props): Promise<React.Rea
           <EditItemForm item={item} />
         </CardContent>
       </Card>
+
+      <section className="mt-8 grid gap-3">
+        <h2 className="text-base font-semibold tracking-tight text-danger">Danger zone</h2>
+        <Card>
+          <CardContent>
+            <p className="mb-3 text-sm text-fg-muted">
+              Delete this listing. It will disappear from the home page and from anyone who saved it.
+              Existing reservations stay on record but the listing won&apos;t be visible.
+            </p>
+            <DeleteButton itemId={item.id} />
+          </CardContent>
+        </Card>
+      </section>
     </main>
   );
 }

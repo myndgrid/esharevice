@@ -143,4 +143,74 @@ meRoute.openapi(
   },
 );
 
+// ─────────────────────── POST /v1/me/provision
+//
+// Called by Auth.js's signIn callback once a new token is verified.
+// Upserts the local `users` row keyed by oidc_sub. Idempotent — repeated
+// calls with the same sub return the same row.
+//
+// Why this exists: the Auth.js JWT round-trips through the Hono API via
+// the standard JWKS verifier (the same path every other authenticated
+// endpoint uses), so this endpoint doesn't trust the request body alone —
+// it cross-checks that the bearer token's `sub` matches the body `sub`.
+// Anyone forging a body without a matching token gets 403.
+
+const ProvisionBodySchema = z
+  .object({
+    sub: z.string().min(1),
+    email: z.string().email().optional(),
+    given_name: z.string().max(120).optional(),
+    family_name: z.string().max(120).optional(),
+    name: z.string().max(240).optional(),
+    email_verified: z.boolean().optional(),
+  })
+  .strict()
+  .openapi("ProvisionBody");
+
+meRoute.openapi(
+  createRoute({
+    method: "post",
+    path: "/me/provision",
+    tags: ["users"],
+    summary: "Upsert the local users row for an Auth.js-verified identity.",
+    description:
+      "Called by Auth.js's signIn callback. Body `sub` must match the bearer " +
+      "token's sub claim — otherwise 403. Returns the local UserPublic shape " +
+      "(useful so the caller can stash the local id alongside the OIDC sub).",
+    security: [{ Bearer: [] }],
+    middleware: [requireAuth] as const,
+    request: {
+      body: { required: true, content: { "application/json": { schema: ProvisionBodySchema } } },
+    },
+    responses: {
+      200: { description: "OK", content: { "application/json": { schema: UserPublicSchema } } },
+      401: { description: "Unauthenticated", content: problemContent },
+      403: { description: "Sub mismatch", content: problemContent },
+    },
+  }),
+  async (c) => {
+    const u = c.get("user");
+    const a = c.get("auth");
+    if (!u || !a) throw new HTTPException(401, { message: "no user attached" });
+    const body = c.req.valid("json");
+    if (body.sub !== a.sub) {
+      throw new HTTPException(403, {
+        message: "Body sub doesn't match token sub. Refusing to provision a different identity.",
+      });
+    }
+    // requireAuth already ran resolveUserFromSub on the sub, so `u` is the
+    // freshly upserted row. Return it directly.
+    return c.json(
+      UserPublic.parse({
+        id: u.id,
+        email: u.email,
+        first_name: u.first_name,
+        last_name: u.last_name,
+        created_at: u.created_at.toISOString(),
+      }),
+      200,
+    );
+  },
+);
+
 export default meRoute;

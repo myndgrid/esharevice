@@ -30,7 +30,7 @@ export async function reserveAction(
     if (err instanceof ApiError) {
       if (err.status === 401) {
         // Session expired — send through the login round-trip and come back.
-        redirect(`/api/auth/login?return_to=${encodeURIComponent(`/items/${itemId}`)}`);
+        redirect(`/login?callbackUrl=${encodeURIComponent(`/items/${itemId}`)}`);
       }
       return { ok: false, error: err.problem.title ?? `Reserve failed (${err.status})` };
     }

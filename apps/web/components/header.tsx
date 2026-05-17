@@ -29,10 +29,10 @@ export async function Header(): Promise<React.ReactElement> {
             </>
           ) : (
             <>
-              <Link href="/api/auth/login?return_to=/&signup=1" prefetch={false}>
+              <Link href="/login?signup=1" prefetch={false}>
                 <Button variant="ghost" size="md">Sign up</Button>
               </Link>
-              <Link href="/api/auth/login?return_to=/" prefetch={false}>
+              <Link href="/login" prefetch={false}>
                 <Button variant="brand" size="md">Sign in</Button>
               </Link>
             </>

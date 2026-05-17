@@ -28,7 +28,7 @@ export async function deleteAction(
   } catch (err) {
     if (err instanceof ApiError) {
       if (err.status === 401) {
-        redirect(`/api/auth/login?return_to=${encodeURIComponent(`/items/${itemId}/edit`)}`);
+        redirect(`/login?callbackUrl=${encodeURIComponent(`/items/${itemId}/edit`)}`);
       }
       if (err.status === 403) return { ok: false, error: "You can only delete your own listings." };
       if (err.status === 404) {

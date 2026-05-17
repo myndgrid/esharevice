@@ -17,7 +17,7 @@ export async function startConversationAction(itemId: string): Promise<void> {
   } catch (err) {
     if (err instanceof ApiError) {
       if (err.status === 401) {
-        redirect(`/api/auth/login?return_to=${encodeURIComponent(`/items/${itemId}`)}`);
+        redirect(`/login?callbackUrl=${encodeURIComponent(`/items/${itemId}`)}`);
       }
       if (err.status === 403) {
         // Owner clicked their own button somehow. Bounce silently.

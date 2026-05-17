@@ -1,0 +1,2500 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>esharevice — what your street already has</title>
+  <meta name="description" content="A neighbour-to-neighbour platform for trading what you have for what you need. Borrow, lend, swap, settle however you both agree." />
+  <meta name="theme-color" content="#f6f2ec" />
+
+  <!-- Fraunces (editorial serif, variable, optical-size) + Geist (premium grotesk) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,700;0,9..144,800;1,9..144,500;1,9..144,700&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ============================================================
+       esharevice — editorial marketplace
+       Distinct visual identity:
+         · Warm paper background + warm ink (no pure black, no rausch red)
+         · Single deep-moss accent (#2c4639), used sparingly as ink-on-paper
+         · Fraunces (editorial serif) for display + Geist for body/UI
+         · Type-led, asymmetric layouts (no centered Airbnb hero)
+         · "Trade pair" is the signature component (this ↔ that)
+         · Kinetic ticker, numbered manifesto, editorial gallery grids
+         · Mobile mock-up rendered alongside as a phone frame
+       ============================================================ */
+
+    :root {
+      /* Surfaces — warm paper, not white */
+      --paper:        #f6f2ec;
+      --paper-2:      #efeae1;
+      --paper-3:      #e6dfd3;
+      --ivory:        #fbf8f3;
+      --white:        #ffffff;
+
+      /* Ink — warm near-black */
+      --ink:          #14110f;
+      --ink-2:        #2b2622;
+      --ink-3:        #5b554d;
+      --ink-4:        #8a8278;
+      --ink-5:        #bcb4a7;
+
+      /* Brand — deep moss. Singular accent, used as ink-on-paper, never as a glow. */
+      --moss:         #2c4639;
+      --moss-deep:    #1c2e26;
+      --moss-soft:    #d9e2dc;
+
+      /* Used very sparingly for active/hover indicators only. */
+      --ochre:        #b08a4a;
+      --ochre-soft:   #f1e7d2;
+
+      /* Rule lines — almost-invisible, woven into the paper */
+      --rule:         #d8d1c3;
+      --rule-soft:    #e6dfd3;
+      --rule-strong:  #b8b0a0;
+
+      /* Type */
+      --serif:        "Fraunces", "Times New Roman", Georgia, serif;
+      --sans:         "Geist", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --mono:         "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+      /* Motion */
+      --ease:         cubic-bezier(0.2, 0, 0, 1);
+      --ease-spring:  cubic-bezier(0.34, 1.56, 0.64, 1);
+
+      /* Radii — tight, editorial */
+      --r-xs:    4px;
+      --r-sm:    6px;
+      --r-md:    10px;
+      --r-lg:    14px;
+      --r-img:   8px;
+      --r-pill:  999px;
+
+      /* Shadows — tinted to paper, never neutral gray */
+      --sh-1: 0 1px 0 rgba(20, 17, 15, 0.05);
+      --sh-2: 0 8px 28px -10px rgba(20, 17, 15, 0.12);
+      --sh-3: 0 18px 52px -20px rgba(20, 17, 15, 0.20);
+
+      --maxw:        1320px;
+      --gutter:      48px;
+      --gutter-sm:   20px;
+    }
+
+    /* Reset */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+    body {
+      background: var(--paper);
+      color: var(--ink);
+      font-family: var(--sans);
+      font-size: 16px;
+      line-height: 1.5;
+      font-weight: 400;
+      overflow-x: hidden;
+      font-feature-settings: "ss01" on, "cv01" on, "cv09" on;
+    }
+    img, svg { display: block; max-width: 100%; }
+    a { color: inherit; text-decoration: none; }
+    button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
+    input, textarea, select { font: inherit; color: inherit; }
+    ul, ol { list-style: none; }
+    ::selection { background: var(--moss); color: var(--ivory); }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+    .wrap { width: 100%; max-width: var(--maxw); margin: 0 auto; padding: 0 var(--gutter); }
+    @media (max-width: 1100px) { .wrap { padding: 0 32px; } }
+    @media (max-width: 720px)  { .wrap { padding: 0 var(--gutter-sm); } }
+
+    /* Editorial labels — newspaper-style "eyebrow" tag */
+    .eyebrow {
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+    }
+    .eyebrow .dot {
+      display: inline-block; vertical-align: middle;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--moss);
+      margin-right: 8px;
+      animation: live-pulse 2.6s var(--ease) infinite;
+    }
+    @keyframes live-pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(44, 70, 57, 0.55); }
+      70%      { box-shadow: 0 0 0 6px rgba(44, 70, 57, 0); }
+    }
+
+    /* Numbered editorial section heads */
+    .folio {
+      display: flex; align-items: baseline; gap: 14px;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+    }
+    .folio .num {
+      font-family: var(--serif);
+      font-style: italic;
+      font-size: 18px;
+      letter-spacing: 0;
+      color: var(--moss);
+      text-transform: none;
+    }
+    .folio .rule {
+      flex: 1; height: 1px; background: var(--rule);
+    }
+
+    /* ============================================================
+       TOP BAR — editorial masthead, sparse, ink wordmark
+       ============================================================ */
+    .mast {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(246, 242, 236, 0.86);
+      backdrop-filter: saturate(120%) blur(14px);
+      -webkit-backdrop-filter: saturate(120%) blur(14px);
+      border-bottom: 1px solid var(--rule);
+    }
+    .mast-inner {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 32px;
+      padding: 18px 0;
+    }
+
+    .brand {
+      display: inline-flex; align-items: center; gap: 10px;
+      color: var(--ink);
+    }
+    .brand .mark {
+      width: 32px; height: 32px;
+      display: grid; place-items: center;
+    }
+    .brand .mark svg { width: 100%; height: 100%; }
+    .brand .word {
+      font-family: var(--serif);
+      font-weight: 500;
+      font-size: 22px;
+      letter-spacing: -0.025em;
+      font-variation-settings: "opsz" 36;
+      line-height: 1;
+    }
+    .brand .word i {
+      font-style: italic;
+      color: var(--moss);
+    }
+
+    .mast-nav {
+      justify-self: center;
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 4px;
+      border: 1px solid var(--rule);
+      border-radius: var(--r-pill);
+      background: var(--ivory);
+    }
+    .mast-nav a {
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--ink-2);
+      border-radius: var(--r-pill);
+      transition: color 0.18s var(--ease), background 0.18s var(--ease);
+    }
+    .mast-nav a:hover { color: var(--ink); background: var(--paper-2); }
+    .mast-nav a.on {
+      color: var(--ivory);
+      background: var(--ink);
+    }
+    @media (max-width: 900px) { .mast-nav { display: none; } }
+
+    .mast-right {
+      display: inline-flex; align-items: center; gap: 8px;
+    }
+    .mast-cta {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 9px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--ink);
+      border-radius: var(--r-pill);
+      transition: background 0.18s var(--ease);
+    }
+    .mast-cta:hover { background: var(--paper-2); }
+    @media (max-width: 720px) { .mast-cta.long { display: none; } }
+
+    .avatar-pill {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 4px 6px 4px 14px;
+      border: 1px solid var(--rule);
+      border-radius: var(--r-pill);
+      transition: box-shadow 0.18s var(--ease), border-color 0.18s var(--ease);
+    }
+    .avatar-pill:hover { box-shadow: var(--sh-1); border-color: var(--rule-strong); }
+    .avatar-pill .seg {
+      width: 14px; height: 14px;
+      display: grid; gap: 2px;
+      align-content: center;
+    }
+    .avatar-pill .seg span { display: block; height: 1.5px; background: var(--ink-2); border-radius: 1px; }
+    .avatar-pill .av {
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      background: var(--moss);
+      color: var(--ivory);
+      display: grid; place-items: center;
+      font-family: var(--serif);
+      font-size: 13px;
+      font-weight: 700;
+      font-style: italic;
+    }
+
+    /* ============================================================
+       HERO — asymmetric, type-led, "trade pair" embedded
+       ============================================================ */
+    .hero {
+      padding: 72px 0 56px;
+      position: relative;
+      border-bottom: 1px solid var(--rule);
+    }
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.15fr 1fr;
+      gap: 64px;
+      align-items: end;
+    }
+    @media (max-width: 980px) {
+      .hero { padding: 48px 0 36px; }
+      .hero-grid { grid-template-columns: 1fr; gap: 40px; align-items: stretch; }
+    }
+
+    .hero-eyebrow {
+      display: flex; align-items: center; gap: 16px;
+      margin-bottom: 28px;
+    }
+    .hero-eyebrow .where {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+    }
+    .hero-eyebrow .where b { color: var(--moss); font-weight: 500; }
+
+    .hero h1 {
+      font-family: var(--serif);
+      font-weight: 500;
+      font-size: clamp(48px, 7vw, 96px);
+      letter-spacing: -0.035em;
+      line-height: 0.95;
+      color: var(--ink);
+      font-variation-settings: "opsz" 144;
+    }
+    .hero h1 .it {
+      font-style: italic;
+      font-weight: 500;
+      color: var(--moss);
+    }
+    .hero h1 .strk {
+      position: relative;
+      display: inline-block;
+      white-space: nowrap;
+    }
+    .hero h1 .strk::after {
+      content: "";
+      position: absolute;
+      left: -2px; right: -2px;
+      bottom: 8px;
+      height: 18px;
+      background: var(--ochre-soft);
+      z-index: -1;
+      border-radius: 2px;
+      transform: skewX(-4deg);
+    }
+
+    .hero p.lead {
+      margin-top: 28px;
+      font-size: 17px;
+      line-height: 1.55;
+      color: var(--ink-3);
+      max-width: 38ch;
+    }
+
+    .hero-cta {
+      margin-top: 36px;
+      display: inline-flex; align-items: center; gap: 12px;
+    }
+    .btn-primary {
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 14px 22px;
+      background: var(--ink);
+      color: var(--ivory);
+      font-size: 14px; font-weight: 500;
+      border-radius: var(--r-pill);
+      transition: transform 0.18s var(--ease), background 0.18s var(--ease);
+    }
+    .btn-primary:hover { background: var(--moss-deep); transform: translateY(-1px); }
+    .btn-primary:active { transform: translateY(0); }
+    .btn-ghost {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 14px 16px;
+      color: var(--ink);
+      font-size: 14px; font-weight: 500;
+      border-radius: var(--r-pill);
+      border: 1px solid var(--rule-strong);
+      transition: background 0.18s var(--ease);
+    }
+    .btn-ghost:hover { background: var(--ivory); }
+
+    /* The signature "trade pair" — two photos joined by a glyph */
+    .pair {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 14px;
+      align-items: stretch;
+      padding: 14px;
+      background: var(--ivory);
+      border: 1px solid var(--rule);
+      border-radius: var(--r-lg);
+      box-shadow: var(--sh-2);
+      transition: transform 0.3s var(--ease), box-shadow 0.3s var(--ease);
+    }
+    .pair:hover { transform: translateY(-2px); box-shadow: var(--sh-3); }
+
+    .pair-side { display: grid; gap: 10px; min-width: 0; }
+    .pair-side .ph {
+      position: relative;
+      aspect-ratio: 4 / 5;
+      border-radius: var(--r-img);
+      overflow: hidden;
+      background: var(--paper-3);
+    }
+    .pair-side .ph img {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      transition: transform 0.6s var(--ease);
+    }
+    .pair-side:hover .ph img { transform: scale(1.04); }
+    .pair-side .lbl {
+      display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+    }
+    .pair-side .role {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--ink-4);
+    }
+    .pair-side .who {
+      font-size: 12px;
+      color: var(--ink-3);
+    }
+    .pair-side .what {
+      font-family: var(--serif);
+      font-weight: 500;
+      font-size: 17px;
+      letter-spacing: -0.012em;
+      line-height: 1.2;
+      color: var(--ink);
+    }
+    .pair-side .where {
+      font-size: 12px;
+      color: var(--ink-4);
+      margin-top: 2px;
+    }
+
+    .pair-glyph {
+      align-self: center;
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      background: var(--moss);
+      color: var(--ivory);
+      display: grid; place-items: center;
+      box-shadow: 0 2px 0 rgba(0,0,0,0.12);
+    }
+    .pair-glyph svg { width: 16px; height: 16px; }
+
+    .pair-footer {
+      grid-column: 1 / -1;
+      display: flex; justify-content: space-between; align-items: center;
+      padding-top: 6px;
+      border-top: 1px dashed var(--rule);
+      margin-top: 4px;
+    }
+    .pair-footer .vouch {
+      display: inline-flex; align-items: center;
+    }
+    .pair-footer .vouch .a {
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      background: var(--paper-3);
+      border: 2px solid var(--ivory);
+      margin-left: -8px;
+      background-size: cover; background-position: center;
+    }
+    .pair-footer .vouch .a:first-child { margin-left: 0; }
+    .pair-footer .meta {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--ink-4);
+    }
+    .pair-footer .propose {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12px; font-weight: 500;
+      color: var(--moss);
+      padding: 6px 10px;
+      border-radius: var(--r-pill);
+      transition: background 0.16s var(--ease);
+    }
+    .pair-footer .propose:hover { background: var(--moss-soft); }
+
+    /* ============================================================
+       INTENT BAR — editorial search, not a pill copy
+       ============================================================ */
+    .intent {
+      margin-top: 56px;
+      background: var(--ivory);
+      border: 1px solid var(--rule);
+      border-radius: var(--r-lg);
+      padding: 8px;
+      display: grid;
+      grid-template-columns: 1.2fr 1fr 1fr auto;
+      align-items: stretch;
+      box-shadow: var(--sh-2);
+    }
+    .intent .seg {
+      padding: 14px 22px;
+      text-align: left;
+      border-radius: var(--r-md);
+      cursor: pointer;
+      transition: background 0.15s var(--ease);
+      position: relative;
+      min-width: 0;
+    }
+    .intent .seg + .seg::before {
+      content: "";
+      position: absolute;
+      left: 0; top: 14px; bottom: 14px;
+      width: 1px; background: var(--rule);
+    }
+    .intent .seg:hover { background: var(--paper-2); }
+    .intent .seg:hover::before,
+    .intent .seg:hover + .seg::before { background: transparent; }
+    .intent .seg .lbl {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--ink-4);
+      margin-bottom: 4px;
+    }
+    .intent .seg .val {
+      font-family: var(--serif);
+      font-weight: 500;
+      font-size: 18px;
+      letter-spacing: -0.012em;
+      color: var(--ink);
+      line-height: 1.2;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .intent .seg .val.placeholder { color: var(--ink-4); font-style: italic; }
+    .intent .go {
+      align-self: center;
+      margin: 6px;
+      padding: 16px 22px;
+      background: var(--moss);
+      color: var(--ivory);
+      font-size: 14px; font-weight: 500;
+      border-radius: var(--r-md);
+      display: inline-flex; align-items: center; gap: 10px;
+      transition: background 0.18s var(--ease), transform 0.15s var(--ease);
+    }
+    .intent .go:hover { background: var(--moss-deep); }
+    .intent .go:active { transform: scale(0.98); }
+    @media (max-width: 980px) {
+      .intent {
+        grid-template-columns: 1fr;
+        padding: 6px;
+      }
+      .intent .seg { padding: 12px 16px; }
+      .intent .seg + .seg::before { display: none; }
+      .intent .seg + .seg { border-top: 1px solid var(--rule); border-radius: 0; }
+      .intent .go { width: 100%; margin: 6px 0 0; justify-content: center; }
+    }
+
+    /* ============================================================
+       LIVE TICKER — single horizontal kinetic marquee
+       ============================================================ */
+    .ticker {
+      background: var(--ink);
+      color: var(--ivory);
+      border-top: 1px solid var(--ink-2);
+      border-bottom: 1px solid var(--ink-2);
+      overflow: hidden;
+      padding: 14px 0;
+      position: relative;
+    }
+    .ticker::before, .ticker::after {
+      content: "";
+      position: absolute;
+      top: 0; bottom: 0;
+      width: 80px;
+      z-index: 2;
+      pointer-events: none;
+    }
+    .ticker::before { left: 0; background: linear-gradient(90deg, var(--ink), transparent); }
+    .ticker::after { right: 0; background: linear-gradient(-90deg, var(--ink), transparent); }
+    .ticker-track {
+      display: inline-flex;
+      gap: 56px;
+      white-space: nowrap;
+      animation: ticker 70s linear infinite;
+    }
+    .ticker-track:hover { animation-play-state: paused; }
+    @keyframes ticker {
+      from { transform: translateX(0); }
+      to   { transform: translateX(-50%); }
+    }
+    .tick {
+      display: inline-flex; align-items: center; gap: 14px;
+      font-family: var(--mono);
+      font-size: 13px;
+      color: rgba(251, 248, 243, 0.78);
+    }
+    .tick .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--moss);
+    }
+    .tick b {
+      font-family: var(--sans);
+      font-weight: 500;
+      color: var(--ivory);
+    }
+    .tick i {
+      font-family: var(--serif);
+      font-style: italic;
+      font-weight: 500;
+      color: rgba(251, 248, 243, 0.95);
+    }
+
+    /* ============================================================
+       CATEGORY STRIP — quiet editorial chips, not Airbnb icon tabs
+       ============================================================ */
+    .cats {
+      padding: 36px 0 32px;
+      border-bottom: 1px solid var(--rule);
+    }
+    .cats-row {
+      display: flex; gap: 10px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .cats-row::-webkit-scrollbar { display: none; }
+    .chip {
+      flex: 0 0 auto;
+      padding: 10px 18px;
+      border: 1px solid var(--rule-strong);
+      border-radius: var(--r-pill);
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--ink-2);
+      background: var(--ivory);
+      transition: background 0.16s var(--ease), color 0.16s var(--ease), border-color 0.16s var(--ease);
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .chip:hover { background: var(--paper-2); }
+    .chip.on { background: var(--ink); color: var(--ivory); border-color: var(--ink); }
+    .chip .num {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--ink-4);
+      margin-left: 6px;
+    }
+    .chip.on .num { color: rgba(251, 248, 243, 0.7); }
+
+    /* ============================================================
+       MAIN GALLERY — editorial grid of trade pairs, mixed scales
+       ============================================================ */
+    .gallery {
+      padding: 56px 0 64px;
+    }
+    .gallery-head {
+      display: flex; align-items: flex-end; justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 32px;
+    }
+    .gallery-head h2 {
+      font-family: var(--serif);
+      font-weight: 500;
+      font-size: clamp(28px, 3vw, 44px);
+      letter-spacing: -0.022em;
+      line-height: 1.05;
+      max-width: 22ch;
+    }
+    .gallery-head h2 i { font-style: italic; color: var(--moss); }
+    .gallery-head .toolbar {
+      display: inline-flex; align-items: center; gap: 8px;
+      flex-shrink: 0;
+    }
+    .toolbar .tool {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 14px;
+      border: 1px solid var(--rule-strong);
+      border-radius: var(--r-pill);
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--ink-2);
+      background: var(--ivory);
+    }
+    .toolbar .tool:hover { background: var(--paper-2); }
+    .toolbar .tool svg { width: 14px; height: 14px; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 32px 24px;
+    }
+    @media (max-width: 980px) { .grid { grid-template-columns: repeat(6, 1fr); gap: 28px 16px; } }
+    @media (max-width: 600px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+
+    /* Trade card — single side (one item posted, "wants" line below) */
+    .card {
+      grid-column: span 4;
+      display: grid;
+      gap: 14px;
+      cursor: pointer;
+    }
+    .card.wide { grid-column: span 6; }
+    .card.tall .ph { aspect-ratio: 3 / 4; }
+    .card.land .ph { aspect-ratio: 5 / 4; }
+    .card.sq   .ph { aspect-ratio: 1 / 1; }
+    @media (max-width: 980px) {
+      .card { grid-column: span 3; }
+      .card.wide { grid-column: span 6; }
+    }
+    @media (max-width: 600px) {
+      .card { grid-column: span 1; }
+      .card.wide { grid-column: span 2; }
+    }
+
+    .card .ph {
+      position: relative;
+      aspect-ratio: 4 / 5;
+      border-radius: var(--r-img);
+      overflow: hidden;
+      background: var(--paper-3);
+    }
+    .card .ph img {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      transition: transform 0.6s var(--ease);
+    }
+    .card:hover .ph img { transform: scale(1.035); }
+    .card .ph .save {
+      position: absolute;
+      top: 12px; right: 12px;
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      background: rgba(20, 17, 15, 0.45);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      color: var(--ivory);
+      display: grid; place-items: center;
+      transition: background 0.18s var(--ease), transform 0.18s var(--ease);
+    }
+    .card .ph .save:hover { background: rgba(20, 17, 15, 0.6); }
+    .card .ph .save svg { width: 16px; height: 16px; }
+    .card .ph .save.on { background: var(--moss); }
+    .card .ph .save.on svg path { fill: var(--ivory); }
+
+    .card .ph .vouched {
+      position: absolute;
+      bottom: 12px; left: 12px;
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 10px;
+      background: rgba(20, 17, 15, 0.55);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      color: var(--ivory);
+      border-radius: var(--r-pill);
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+    .card .ph .vouched svg { width: 11px; height: 11px; }
+
+    .card .meta-row {
+      display: flex; justify-content: space-between; align-items: baseline;
+      gap: 8px;
+    }
+    .card .who {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--ink-4);
+    }
+    .card .price {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      color: var(--moss);
+      text-transform: uppercase;
+    }
+    .card h3 {
+      font-family: var(--serif);
+      font-weight: 500;
+      font-size: 22px;
+      letter-spacing: -0.015em;
+      line-height: 1.18;
+      color: var(--ink);
+    }
+    .card .wants {
+      display: flex; align-items: baseline; gap: 8px;
+      font-size: 14px;
+      line-height: 1.45;
+      color: var(--ink-3);
+    }
+    .card .wants .arrow {
+      flex-shrink: 0;
+      width: 14px; height: 1px;
+      background: var(--ink-4);
+      position: relative;
+      top: 7px;
+    }
+    .card .wants .arrow::after {
+      content: "";
+      position: absolute;
+      right: 0; top: -2px;
+      width: 5px; height: 5px;
+      border-top: 1px solid var(--ink-4);
+      border-right: 1px solid var(--ink-4);
+      transform: rotate(45deg);
+    }
+    .card .wants b {
+      color: var(--ink);
+      font-weight: 500;
+    }
+    .card .footline {
+      display: flex; justify-content: space-between; align-items: center;
+      padding-top: 8px;
+      border-top: 1px solid var(--rule);
+      font-size: 12px;
+      color: var(--ink-4);
+    }
+    .card .footline .v {
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    .card .footline .v svg { width: 12px; height: 12px; color: var(--moss); }
+
+    /* ============================================================
+       MANIFESTO — numbered editorial blocks, no SaaS feature cards
+       ============================================================ */
+    .manifesto {
+      padding: 96px 0;
+      border-top: 1px solid var(--rule);
+      background: var(--paper);
+    }
+    .manifesto-head {
+      max-width: 720px;
+      margin-bottom: 56px;
+    }
+    .manifesto-head .folio { margin-bottom: 28px; }
+    .manifesto-head h2 {
+      font-family: var(--serif);
+      font-weight: 500;
+      font-size: clamp(34px, 4.5vw, 60px);
+      letter-spacing: -0.025em;
+      line-height: 1.05;
+    }
+    .manifesto-head h2 i { font-style: italic; color: var(--moss); }
+    .manifesto-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 48px;
+      border-top: 1px solid var(--rule);
+      padding-top: 56px;
+    }
+    @media (max-width: 900px) { .manifesto-grid { grid-template-columns: 1fr; gap: 56px; } }
+    .stanza {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+    .stanza .num {
+      font-family: var(--serif);
+      font-style: italic;
+      font-weight: 500;
+      font-size: 56px;
+      line-height: 0.9;
+      color: var(--moss);
+      font-variation-settings: "opsz" 144;
+    }
+    .stanza h3 {
+      font-family: var(--serif);
+      font-weight: 500;
+      font-size: 24px;
+      letter-spacing: -0.014em;
+      line-height: 1.2;
+      margin-bottom: 12px;
+    }
+    .stanza p {
+      font-size: 15px;
+      line-height: 1.55;
+      color: var(--ink-3);
+      max-width: 36ch;
+    }
+    .stanza .annot {
+      margin-top: 14px;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--ink-4);
+    }
+    .stanza .annot b { color: var(--moss); font-weight: 500; }
+
+    /* ============================================================
+       MAP + NEIGHBOURHOODS — split, the map carries the section
+       ============================================================ */
+    .map-sec {
+      padding: 96px 0;
+      border-top: 1px solid var(--rule);
+    }
+    .map-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 56px;
+      align-items: center;
+    }
+    @media (max-width: 980px) { .map-grid { grid-template-columns: 1fr; gap: 36px; } }
+
+    .map-art {
+      position: relative;
+      aspect-ratio: 4 / 3;
+      background: var(--moss-deep);
+      border-radius: var(--r-lg);
+      overflow: hidden;
+    }
+    /* abstract map vignette — soft moss isobars with pulsing dots */
+    .map-art .layer {
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse at 30% 40%, rgba(255,255,255,0.06) 0, transparent 50%),
+        radial-gradient(ellipse at 70% 65%, rgba(255,255,255,0.05) 0, transparent 55%);
+    }
+    .map-art .iso {
+      position: absolute; inset: 0;
+      background-image:
+        radial-gradient(circle at 30% 50%, rgba(255,255,255,0) 18%, rgba(255,255,255,0.07) 18.5%, rgba(255,255,255,0) 19.5%),
+        radial-gradient(circle at 30% 50%, rgba(255,255,255,0) 28%, rgba(255,255,255,0.06) 28.5%, rgba(255,255,255,0) 29.5%),
+        radial-gradient(circle at 30% 50%, rgba(255,255,255,0) 40%, rgba(255,255,255,0.05) 40.5%, rgba(255,255,255,0) 41.5%),
+        radial-gradient(circle at 70% 60%, rgba(255,255,255,0) 20%, rgba(255,255,255,0.06) 20.5%, rgba(255,255,255,0) 21.5%),
+        radial-gradient(circle at 70% 60%, rgba(255,255,255,0) 32%, rgba(255,255,255,0.05) 32.5%, rgba(255,255,255,0) 33.5%);
+    }
+    .map-art .grid-lines {
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
+      background-size: 56px 56px;
+    }
+    .map-art .pin {
+      position: absolute;
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      background: var(--ochre);
+      box-shadow: 0 0 0 0 rgba(176, 138, 74, 0.6);
+      animation: pin-pulse 3s var(--ease) infinite;
+    }
+    .map-art .pin.b { background: var(--paper); }
+    .map-art .pin.c { background: var(--moss-soft); }
+    @keyframes pin-pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(176, 138, 74, 0.55); }
+      70%      { box-shadow: 0 0 0 16px rgba(176, 138, 74, 0); }
+    }
+    .map-art .label {
+      position: absolute;
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: rgba(251, 248, 243, 0.65);
+      white-space: nowrap;
+    }
+    .map-art .label.b { color: rgba(251, 248, 243, 0.85); }
+    .map-art .label::before {
+      content: "";
+      display: inline-block; vertical-align: middle;
+      width: 14px; height: 1px;
+      background: rgba(251, 248, 243, 0.4);
+      margin-right: 8px;
+    }
+    .map-art .compass {
+      position: absolute;
+      right: 18px; bottom: 18px;
+      font-family: var(--serif);
+      font-style: italic;
+      font-size: 14px;
+      color: rgba(251, 248, 243, 0.7);
+      letter-spacing: -0.02em;
+    }
+    .map-art .compass b { font-style: normal; color: var(--paper); font-weight: 500; }
+
+    .map-side h2 {
+      font-family: var(--serif);
+      font-weight: 500;
+      font-size: clamp(28px, 3.2vw, 42px);
+      letter-spacing: -0.022em;
+      line-height: 1.08;
+      margin-bottom: 28px;
+    }
+    .map-side h2 i { font-style: italic; color: var(--moss); }
+    .map-side .hoods {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      border-top: 1px solid var(--rule);
+    }
+    .map-side .hoods a {
+      display: flex; justify-content: space-between; align-items: baseline;
+      gap: 12px;
+      padding: 14px 4px;
+      border-bottom: 1px solid var(--rule);
+      transition: padding 0.18s var(--ease);
+    }
+    .map-side .hoods a:hover { padding-left: 10px; }
+    .map-side .hoods a:hover .nm { color: var(--moss); }
+    .map-side .hoods a .nm {
+      font-family: var(--serif);
+      font-weight: 500;
+      font-size: 18px;
+      letter-spacing: -0.012em;
+      color: var(--ink);
+      transition: color 0.18s var(--ease);
+    }
+    .map-side .hoods a .ct {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      color: var(--ink-4);
+    }
+
+    /* ============================================================
+       PROVIDER BAND — quiet editorial CTA, no rausch panel
+       ============================================================ */
+    .provider {
+      padding: 96px 0;
+      border-top: 1px solid var(--rule);
+      background: var(--ink);
+      color: var(--ivory);
+    }
+    .provider-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 56px;
+      align-items: center;
+    }
+    @media (max-width: 980px) { .provider-grid { grid-template-columns: 1fr; gap: 36px; } }
+    .provider .folio { color: rgba(251, 248, 243, 0.55); }
+    .provider .folio .rule { background: rgba(251, 248, 243, 0.2); }
+    .provider .folio .num { color: var(--moss-soft); }
+    .provider h2 {
+      font-family: var(--serif);
+      font-weight: 500;
+      font-size: clamp(36px, 4.5vw, 60px);
+      letter-spacing: -0.025em;
+      line-height: 1.04;
+      margin-top: 24px;
+    }
+    .provider h2 i { font-style: italic; color: var(--moss-soft); }
+    .provider p {
+      margin-top: 22px;
+      font-size: 16px;
+      line-height: 1.6;
+      color: rgba(251, 248, 243, 0.7);
+      max-width: 44ch;
+    }
+    .provider .cta-row {
+      margin-top: 36px;
+      display: inline-flex; gap: 12px; align-items: center;
+    }
+    .provider .cta-row .ln {
+      padding: 14px 24px;
+      background: var(--paper);
+      color: var(--ink);
+      border-radius: var(--r-pill);
+      font-size: 14px; font-weight: 500;
+      transition: background 0.18s var(--ease), transform 0.15s var(--ease);
+    }
+    .provider .cta-row .ln:hover { background: var(--ivory); transform: translateY(-1px); }
+    .provider .cta-row .ln2 {
+      padding: 14px 18px;
+      color: var(--ivory);
+      font-size: 14px; font-weight: 500;
+      border-radius: var(--r-pill);
+      border: 1px solid rgba(251, 248, 243, 0.2);
+      transition: background 0.18s var(--ease);
+    }
+    .provider .cta-row .ln2:hover { background: rgba(251, 248, 243, 0.08); }
+
+    .provider-side {
+      display: grid;
+      gap: 16px;
+    }
+    .testimony {
+      padding: 24px;
+      border: 1px solid rgba(251, 248, 243, 0.14);
+      border-radius: var(--r-lg);
+    }
+    .testimony .quote {
+      font-family: var(--serif);
+      font-style: italic;
+      font-size: 18px;
+      line-height: 1.45;
+      letter-spacing: -0.01em;
+      color: var(--ivory);
+    }
+    .testimony .quote::before { content: "\\201C"; margin-right: 2px; }
+    .testimony .quote::after  { content: "\\201D"; margin-left: 2px; }
+    .testimony .by {
+      margin-top: 14px;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: rgba(251, 248, 243, 0.5);
+    }
+    .testimony .by b { color: rgba(251, 248, 243, 0.85); font-weight: 500; }
+
+    /* ============================================================
+       FOOTER — newsprint folio
+       ============================================================ */
+    .colofon {
+      background: var(--paper);
+      padding: 56px 0 32px;
+      border-top: 1px solid var(--rule);
+    }
+    .colofon-grid {
+      display: grid;
+      grid-template-columns: 1.4fr repeat(3, 1fr);
+      gap: 48px;
+    }
+    @media (max-width: 820px) { .colofon-grid { grid-template-columns: 1fr 1fr; gap: 36px; } }
+    .colofon h5 {
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+      margin-bottom: 18px;
+    }
+    .colofon .brand-side .word {
+      font-family: var(--serif);
+      font-size: 28px;
+      font-weight: 500;
+      letter-spacing: -0.025em;
+    }
+    .colofon .brand-side .word i { font-style: italic; color: var(--moss); }
+    .colofon .brand-side p {
+      margin-top: 14px;
+      font-size: 14px;
+      line-height: 1.55;
+      color: var(--ink-3);
+      max-width: 38ch;
+    }
+    .colofon ul { display: grid; gap: 10px; }
+    .colofon ul a { font-size: 14px; color: var(--ink-2); }
+    .colofon ul a:hover { color: var(--moss); }
+    .colo-bottom {
+      margin-top: 56px;
+      padding-top: 24px;
+      border-top: 1px solid var(--rule);
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--ink-4);
+    }
+    .colo-bottom .legals { display: flex; gap: 18px; }
+    .colo-bottom a { color: var(--ink-4); }
+    .colo-bottom a:hover { color: var(--ink); }
+
+    /* ============================================================
+       MOBILE PREVIEW — phone frames showing the same screens
+       ============================================================ */
+    .mob-sec {
+      padding: 96px 0;
+      background: var(--paper-2);
+      border-top: 1px solid var(--rule);
+    }
+    .mob-head {
+      max-width: 720px;
+      margin-bottom: 48px;
+    }
+    .mob-head .folio { margin-bottom: 24px; }
+    .mob-head h2 {
+      font-family: var(--serif);
+      font-weight: 500;
+      font-size: clamp(28px, 3.4vw, 44px);
+      letter-spacing: -0.022em;
+      line-height: 1.06;
+    }
+    .mob-head h2 i { font-style: italic; color: var(--moss); }
+    .mob-head p {
+      margin-top: 18px;
+      font-size: 15px;
+      color: var(--ink-3);
+      max-width: 56ch;
+    }
+
+    .phones {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 36px;
+      align-items: start;
+    }
+    @media (max-width: 1100px) { .phones { grid-template-columns: 1fr 1fr; } .phones .ph-3 { display: none; } }
+    @media (max-width: 720px)  { .phones { grid-template-columns: 1fr; gap: 32px; justify-items: center; } .phones .ph-2, .phones .ph-3 { display: none; } }
+
+    .phone {
+      width: 320px;
+      max-width: 100%;
+      margin: 0 auto;
+      padding: 12px;
+      background: var(--ink);
+      border-radius: 44px;
+      box-shadow: var(--sh-3);
+      position: relative;
+    }
+    .phone .screen {
+      background: var(--paper);
+      border-radius: 32px;
+      overflow: hidden;
+      position: relative;
+      aspect-ratio: 9 / 19.5;
+    }
+    .phone .notch {
+      position: absolute;
+      top: 16px; left: 50%; transform: translateX(-50%);
+      width: 96px; height: 22px;
+      background: var(--ink);
+      border-radius: 20px;
+      z-index: 3;
+    }
+    .phone-label {
+      text-align: center;
+      margin-top: 18px;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+    }
+
+    /* phone inner UI — re-uses fragments at small scale */
+    .m-status {
+      padding: 14px 16px 8px;
+      display: flex; justify-content: space-between; align-items: center;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--ink-2);
+    }
+    .m-status .ic {
+      display: inline-flex; gap: 4px;
+      align-items: center;
+    }
+    .m-mast {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 4px 18px 12px;
+    }
+    .m-mast .word {
+      font-family: var(--serif);
+      font-size: 22px;
+      font-weight: 500;
+      letter-spacing: -0.025em;
+    }
+    .m-mast .word i { font-style: italic; color: var(--moss); }
+    .m-mast .av {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: var(--moss);
+      color: var(--ivory);
+      display: grid; place-items: center;
+      font-family: var(--serif);
+      font-style: italic;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .m-hero {
+      padding: 8px 18px 16px;
+    }
+    .m-hero .eb {
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+      margin-bottom: 12px;
+    }
+    .m-hero .eb b { color: var(--moss); font-weight: 500; }
+    .m-hero h1 {
+      font-family: var(--serif);
+      font-weight: 500;
+      font-size: 32px;
+      letter-spacing: -0.025em;
+      line-height: 0.98;
+    }
+    .m-hero h1 i { font-style: italic; color: var(--moss); }
+    .m-intent {
+      margin: 16px 18px;
+      background: var(--ivory);
+      border: 1px solid var(--rule);
+      border-radius: 14px;
+      padding: 4px;
+      display: grid;
+    }
+    .m-intent .row {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--rule);
+    }
+    .m-intent .row:last-of-type { border-bottom: 0; }
+    .m-intent .lbl {
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--ink-4);
+      margin-bottom: 2px;
+    }
+    .m-intent .val {
+      font-family: var(--serif);
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: -0.012em;
+    }
+    .m-intent .val.placeholder { color: var(--ink-4); font-style: italic; }
+    .m-intent .go {
+      margin: 4px;
+      padding: 11px;
+      background: var(--moss);
+      color: var(--ivory);
+      border-radius: 10px;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .m-chips {
+      display: flex;
+      gap: 6px;
+      padding: 4px 18px 14px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .m-chips::-webkit-scrollbar { display: none; }
+    .m-chip {
+      flex: 0 0 auto;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--ink-2);
+      background: var(--ivory);
+      border: 1px solid var(--rule-strong);
+      white-space: nowrap;
+    }
+    .m-chip.on { background: var(--ink); color: var(--ivory); border-color: var(--ink); }
+    .m-pairs {
+      padding: 4px 18px 90px;
+      display: grid;
+      gap: 18px;
+    }
+    .m-card {
+      display: grid;
+      gap: 8px;
+    }
+    .m-card .ph {
+      position: relative;
+      aspect-ratio: 4 / 5;
+      border-radius: 10px;
+      overflow: hidden;
+      background: var(--paper-3);
+    }
+    .m-card .ph img { width: 100%; height: 100%; object-fit: cover; }
+    .m-card .ph .save {
+      position: absolute;
+      top: 8px; right: 8px;
+      width: 26px; height: 26px;
+      background: rgba(20, 17, 15, 0.45);
+      backdrop-filter: blur(6px);
+      border-radius: 50%;
+      color: var(--ivory);
+      display: grid; place-items: center;
+    }
+    .m-card .ph .save svg { width: 12px; height: 12px; }
+    .m-card .who {
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: 0.14em;
+      color: var(--ink-4);
+      text-transform: uppercase;
+    }
+    .m-card h3 {
+      font-family: var(--serif);
+      font-size: 16px;
+      font-weight: 500;
+      letter-spacing: -0.012em;
+      line-height: 1.18;
+    }
+    .m-card .wants {
+      font-size: 12px;
+      color: var(--ink-3);
+      line-height: 1.4;
+    }
+    .m-card .wants b { color: var(--ink); font-weight: 500; }
+    .m-bottombar {
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      padding: 12px 18px 22px;
+      background: rgba(246, 242, 236, 0.94);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border-top: 1px solid var(--rule);
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+    }
+    .m-tab {
+      display: grid;
+      gap: 4px;
+      justify-items: center;
+      color: var(--ink-4);
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+    .m-tab svg { width: 20px; height: 20px; }
+    .m-tab.on { color: var(--ink); }
+    .m-tab.list svg { color: var(--moss); }
+    .m-tab.fab {
+      width: 48px; height: 48px;
+      background: var(--ink);
+      color: var(--ivory);
+      border-radius: 999px;
+      display: grid; place-items: center;
+      margin-top: -16px;
+      box-shadow: var(--sh-2);
+    }
+    .m-tab.fab svg { width: 18px; height: 18px; }
+
+    /* Phone 2 — item detail */
+    .m-detail {
+      padding: 0 0 90px;
+    }
+    .m-detail .hero-ph {
+      aspect-ratio: 4 / 5;
+      background: var(--paper-3);
+      position: relative;
+    }
+    .m-detail .hero-ph img { width: 100%; height: 100%; object-fit: cover; }
+    .m-detail .hero-ph .back {
+      position: absolute;
+      top: 50px; left: 16px;
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      background: rgba(20, 17, 15, 0.45);
+      backdrop-filter: blur(8px);
+      color: var(--ivory);
+      display: grid; place-items: center;
+    }
+    .m-detail .hero-ph .back svg { width: 14px; height: 14px; }
+    .m-detail .hero-ph .save {
+      position: absolute;
+      top: 50px; right: 16px;
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      background: rgba(20, 17, 15, 0.45);
+      backdrop-filter: blur(8px);
+      color: var(--ivory);
+      display: grid; place-items: center;
+    }
+    .m-detail .hero-ph .save svg { width: 14px; height: 14px; }
+    .m-detail .hero-ph .dots {
+      position: absolute;
+      bottom: 14px; left: 50%; transform: translateX(-50%);
+      display: inline-flex; gap: 5px;
+    }
+    .m-detail .hero-ph .dots span {
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: rgba(251, 248, 243, 0.5);
+    }
+    .m-detail .hero-ph .dots span.on { background: var(--ivory); }
+    .m-detail .body {
+      padding: 22px 20px 0;
+    }
+    .m-detail .who-line {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 12px;
+    }
+    .m-detail .who-line .who {
+      display: flex; align-items: center; gap: 10px;
+    }
+    .m-detail .who-line .who .av {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: var(--moss);
+      color: var(--ivory);
+      display: grid; place-items: center;
+      font-family: var(--serif);
+      font-style: italic;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .m-detail .who-line .who .nm {
+      font-family: var(--serif);
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .m-detail .who-line .who .nm small {
+      display: block;
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: 0.14em;
+      color: var(--ink-4);
+      text-transform: uppercase;
+      font-style: normal;
+    }
+    .m-detail .who-line .vouch {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      color: var(--moss);
+      text-transform: uppercase;
+    }
+    .m-detail h2 {
+      font-family: var(--serif);
+      font-size: 26px;
+      font-weight: 500;
+      letter-spacing: -0.022em;
+      line-height: 1.08;
+      margin-bottom: 14px;
+    }
+    .m-detail .wants {
+      padding: 14px;
+      background: var(--ivory);
+      border: 1px solid var(--rule);
+      border-radius: 12px;
+      margin-bottom: 16px;
+    }
+    .m-detail .wants .lbl {
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: 0.16em;
+      color: var(--ink-4);
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .m-detail .wants .val {
+      font-family: var(--serif);
+      font-size: 16px;
+      font-weight: 500;
+      letter-spacing: -0.012em;
+    }
+    .m-detail .specs {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 0;
+      margin-bottom: 16px;
+      border-top: 1px solid var(--rule);
+    }
+    .m-detail .specs .s {
+      padding: 12px 0;
+      border-bottom: 1px solid var(--rule);
+    }
+    .m-detail .specs .s .l {
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: 0.14em;
+      color: var(--ink-4);
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+    .m-detail .specs .s .v {
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .m-detail p.desc {
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--ink-3);
+    }
+    .m-detail .actions {
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      padding: 12px 18px 22px;
+      background: rgba(246, 242, 236, 0.94);
+      backdrop-filter: blur(18px);
+      border-top: 1px solid var(--rule);
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 10px;
+    }
+    .m-detail .actions .msg {
+      width: 44px; height: 44px;
+      border-radius: 12px;
+      border: 1px solid var(--rule-strong);
+      display: grid; place-items: center;
+      color: var(--ink);
+    }
+    .m-detail .actions .msg svg { width: 18px; height: 18px; }
+    .m-detail .actions .propose {
+      padding: 12px;
+      background: var(--ink);
+      color: var(--ivory);
+      border-radius: 12px;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    /* Phone 3 — propose-a-trade flow (the moment that closes the loop) */
+    .m-propose {
+      padding: 0 0 90px;
+    }
+    .m-propose .top {
+      padding: 50px 20px 16px;
+      display: flex; justify-content: space-between; align-items: center;
+      border-bottom: 1px solid var(--rule);
+    }
+    .m-propose .top .back {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      border: 1px solid var(--rule-strong);
+      display: grid; place-items: center;
+      background: var(--ivory);
+    }
+    .m-propose .top .back svg { width: 14px; height: 14px; }
+    .m-propose .top .ttl {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+    }
+    .m-propose .top .step {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--moss);
+    }
+    .m-propose h2 {
+      padding: 24px 20px 0;
+      font-family: var(--serif);
+      font-size: 24px;
+      font-weight: 500;
+      letter-spacing: -0.022em;
+      line-height: 1.1;
+    }
+    .m-propose h2 i { font-style: italic; color: var(--moss); }
+    .m-propose .their {
+      margin: 18px 20px 0;
+      padding: 12px;
+      background: var(--ivory);
+      border: 1px solid var(--rule);
+      border-radius: 12px;
+      display: grid;
+      grid-template-columns: 56px 1fr;
+      gap: 12px;
+      align-items: center;
+    }
+    .m-propose .their .pic {
+      width: 56px; height: 56px;
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--paper-3);
+    }
+    .m-propose .their .pic img { width: 100%; height: 100%; object-fit: cover; }
+    .m-propose .their .meta .role {
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: 0.14em;
+      color: var(--ink-4);
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+    .m-propose .their .meta .nm {
+      font-family: var(--serif);
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: -0.012em;
+    }
+    .m-propose .their .meta .by {
+      font-size: 11px;
+      color: var(--ink-4);
+      margin-top: 2px;
+    }
+    .m-propose .you-label {
+      padding: 22px 20px 8px;
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      color: var(--ink-3);
+      text-transform: uppercase;
+    }
+    .m-propose .options {
+      padding: 0 20px;
+      display: grid;
+      gap: 10px;
+    }
+    .m-propose .option {
+      padding: 14px;
+      background: var(--ivory);
+      border: 1px solid var(--rule);
+      border-radius: 12px;
+      display: grid;
+      grid-template-columns: 22px 1fr auto;
+      gap: 12px;
+      align-items: center;
+    }
+    .m-propose .option.on {
+      border-color: var(--moss);
+      box-shadow: 0 0 0 3px var(--moss-soft);
+    }
+    .m-propose .option .radio {
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      border: 1.5px solid var(--rule-strong);
+      position: relative;
+    }
+    .m-propose .option.on .radio { border-color: var(--moss); }
+    .m-propose .option.on .radio::after {
+      content: "";
+      position: absolute;
+      inset: 3px;
+      border-radius: 50%;
+      background: var(--moss);
+    }
+    .m-propose .option .meta {
+      min-width: 0;
+    }
+    .m-propose .option .meta .lbl {
+      font-family: var(--serif);
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: -0.012em;
+      line-height: 1.18;
+    }
+    .m-propose .option .meta .det {
+      font-size: 11px;
+      color: var(--ink-4);
+      margin-top: 2px;
+    }
+    .m-propose .option .pic {
+      width: 36px; height: 36px;
+      border-radius: 6px;
+      overflow: hidden;
+      background: var(--paper-3);
+    }
+    .m-propose .option .pic img { width: 100%; height: 100%; object-fit: cover; }
+    .m-propose .add-new {
+      margin: 12px 20px 0;
+      padding: 14px;
+      border: 1px dashed var(--rule-strong);
+      border-radius: 12px;
+      text-align: center;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+      cursor: pointer;
+    }
+    .m-propose .note {
+      padding: 20px 20px 0;
+    }
+    .m-propose .note .lbl {
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: 0.16em;
+      color: var(--ink-4);
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .m-propose .note textarea {
+      width: 100%;
+      min-height: 56px;
+      border: 1px solid var(--rule);
+      background: var(--ivory);
+      border-radius: 10px;
+      padding: 10px;
+      font-family: var(--serif);
+      font-size: 13px;
+      resize: none;
+    }
+    .m-propose .footer-bar {
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      padding: 12px 18px 22px;
+      background: rgba(246, 242, 236, 0.94);
+      backdrop-filter: blur(18px);
+      border-top: 1px solid var(--rule);
+    }
+    .m-propose .footer-bar .submit {
+      padding: 14px;
+      background: var(--moss);
+      color: var(--ivory);
+      border-radius: 12px;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ============ MASTHEAD ============ -->
+  <header class="mast">
+    <div class="wrap mast-inner">
+      <a class="brand" href="#" aria-label="esharevice home">
+        <span class="mark" aria-hidden="true">
+          <!-- Custom brand mark — interlocking loop, two arcs forming a reciprocal swap glyph -->
+          <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+            <path d="M9 6 C 3.5 6 3.5 14 9 14 L 23 14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+            <path d="M23 18 C 28.5 18 28.5 26 23 26 L 9 26" fill="none" stroke="#2c4639" stroke-width="2.4" stroke-linecap="round"/>
+            <circle cx="23" cy="14" r="2.2" fill="currentColor"/>
+            <circle cx="9" cy="26" r="2.2" fill="#2c4639"/>
+          </svg>
+        </span>
+        <span class="word">esharev<i>i</i>ce</span>
+      </a>
+
+      <nav class="mast-nav" aria-label="Primary">
+        <a href="#" class="on">Browse</a>
+        <a href="#">List a trade</a>
+        <a href="#">How it works</a>
+        <a href="#">Neighbourhoods</a>
+      </nav>
+
+      <div class="mast-right">
+        <a class="mast-cta long" href="#">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+          Inbox
+        </a>
+        <button class="avatar-pill" aria-label="Profile menu">
+          <span class="seg"><span></span><span></span><span></span></span>
+          <span class="av">M</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ============ HERO ============ -->
+  <section class="hero">
+    <div class="wrap">
+
+      <div class="hero-eyebrow">
+        <span class="eyebrow"><span class="dot"></span>Live · 14 trades pending</span>
+        <span class="where">Cardiff &amp; Swansea — Bristol joining <b>autumn 2026</b></span>
+      </div>
+
+      <div class="hero-grid">
+        <div>
+          <h1>
+            What your street<br />
+            already <span class="it">has,</span><br />
+            <span class="strk">in trade for</span> what<br />
+            you can offer.
+          </h1>
+
+          <p class="lead">
+            A neighbour-to-neighbour platform for trading tools, time, skills, and small kindnesses — no money, no fees, no awkwardness about who owes whom.
+          </p>
+
+          <div class="hero-cta">
+            <a class="btn-primary" href="#">
+              Browse nearby
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </a>
+            <a class="btn-ghost" href="#">List a trade</a>
+          </div>
+        </div>
+
+        <div>
+          <div class="folio" style="margin-bottom:14px">
+            <span class="num">↓</span>
+            <span>Trade #1042 · Pontcanna</span>
+            <span class="rule"></span>
+            <span>14 min ago</span>
+          </div>
+          <article class="pair">
+            <div class="pair-side">
+              <div class="ph">
+                <img src="https://picsum.photos/seed/sourdough-ed-1/600/750" alt="A jar of sourdough starter on a wooden counter" />
+              </div>
+              <div class="lbl">
+                <span class="role">She has</span>
+                <span class="who">Mei-Lin W.</span>
+              </div>
+              <div class="what">A four-year sourdough starter, weekly feeding card included.</div>
+              <div class="where">Pontcanna · 0.3 mi</div>
+            </div>
+            <span class="pair-glyph" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m17 3 4 4-4 4"/><path d="M21 7H7"/>
+                <path d="m7 21-4-4 4-4"/><path d="M3 17h14"/>
+              </svg>
+            </span>
+            <div class="pair-side">
+              <div class="ph">
+                <img src="https://picsum.photos/seed/grouting-ed-1/600/750" alt="Hands re-grouting a bathroom tile" />
+              </div>
+              <div class="lbl">
+                <span class="role">She wants</span>
+                <span class="who">— from you</span>
+              </div>
+              <div class="what">Half a Saturday re-grouting the upstairs bathroom (she has the materials).</div>
+              <div class="where">~ 3 hours · weekday OK</div>
+            </div>
+            <div class="pair-footer">
+              <div class="vouch" aria-label="3 mutual vouches">
+                <span class="a" style="background-image:url('https://picsum.photos/seed/v-1/60/60')"></span>
+                <span class="a" style="background-image:url('https://picsum.photos/seed/v-2/60/60')"></span>
+                <span class="a" style="background-image:url('https://picsum.photos/seed/v-3/60/60')"></span>
+              </div>
+              <span class="meta">3 mutual vouches</span>
+              <a class="propose" href="#">
+                Propose a trade
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+              </a>
+            </div>
+          </article>
+        </div>
+      </div>
+
+      <!-- Intent bar -->
+      <form class="intent" role="search" onsubmit="event.preventDefault();">
+        <button type="button" class="seg">
+          <div class="lbl">I need</div>
+          <div class="val">A sewing machine, a long evening</div>
+        </button>
+        <button type="button" class="seg">
+          <div class="lbl">Near</div>
+          <div class="val">Pontcanna · within 0.5 mi</div>
+        </button>
+        <button type="button" class="seg">
+          <div class="lbl">I'll offer</div>
+          <div class="val placeholder">Add what you bring</div>
+        </button>
+        <button type="submit" class="go">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+          Find a match
+        </button>
+      </form>
+    </div>
+  </section>
+
+  <!-- ============ LIVE TICKER ============ -->
+  <section class="ticker" aria-label="Live trade activity">
+    <div class="ticker-track">
+      <span class="tick"><span class="dot"></span><b>Marisol A.</b> borrowed a <i>Sewmor 600</i> from Bastian R. · Grangetown</span>
+      <span class="tick"><span class="dot"></span><b>Theo K.</b> listed a <i>Zoom F3 field-recording rig</i> · Cathays</span>
+      <span class="tick"><span class="dot"></span><b>Soraya K.</b> pulled espresso for Anaïs T. — settled in <i>portrait sittings</i></span>
+      <span class="tick"><span class="dot"></span><b>Ezekiel O.</b> tuned Priya R.'s <i>rear derailleur</i> · Splott</span>
+      <span class="tick"><span class="dot"></span><b>Mei-Lin W.</b> handed off a <i>sourdough starter</i> to Cosima V.</span>
+      <span class="tick"><span class="dot"></span><b>Priya R.</b> traded <i>Mandarin practice</i> for piano-moving help</span>
+      <!-- duplicate for seamless marquee -->
+      <span class="tick"><span class="dot"></span><b>Marisol A.</b> borrowed a <i>Sewmor 600</i> from Bastian R. · Grangetown</span>
+      <span class="tick"><span class="dot"></span><b>Theo K.</b> listed a <i>Zoom F3 field-recording rig</i> · Cathays</span>
+      <span class="tick"><span class="dot"></span><b>Soraya K.</b> pulled espresso for Anaïs T. — settled in <i>portrait sittings</i></span>
+      <span class="tick"><span class="dot"></span><b>Ezekiel O.</b> tuned Priya R.'s <i>rear derailleur</i> · Splott</span>
+      <span class="tick"><span class="dot"></span><b>Mei-Lin W.</b> handed off a <i>sourdough starter</i> to Cosima V.</span>
+      <span class="tick"><span class="dot"></span><b>Priya R.</b> traded <i>Mandarin practice</i> for piano-moving help</span>
+    </div>
+  </section>
+
+  <!-- ============ CATEGORIES ============ -->
+  <section class="cats">
+    <div class="wrap">
+      <div class="folio" style="margin-bottom:16px">
+        <span class="num">01</span>
+        <span>What's on the street</span>
+        <span class="rule"></span>
+        <span>1,247 trades · 11 neighbourhoods</span>
+      </div>
+      <div class="cats-row">
+        <button class="chip on">All <span class="num">1,247</span></button>
+        <button class="chip">Tools <span class="num">412</span></button>
+        <button class="chip">Skills &amp; hours <span class="num">298</span></button>
+        <button class="chip">Kitchen <span class="num">144</span></button>
+        <button class="chip">Wheels <span class="num">86</span></button>
+        <button class="chip">Garden <span class="num">112</span></button>
+        <button class="chip">Studio time <span class="num">63</span></button>
+        <button class="chip">Lessons <span class="num">94</span></button>
+        <button class="chip">Edibles <span class="num">38</span></button>
+        <button class="chip">Vouched only</button>
+        <button class="chip">New this week</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ GALLERY ============ -->
+  <section class="gallery">
+    <div class="wrap">
+      <div class="gallery-head">
+        <h2>Listings near you, <i>each with what they'd take</i> in trade.</h2>
+        <div class="toolbar">
+          <button class="tool">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M6 12h12M10 18h4"/></svg>
+            Filters
+          </button>
+          <button class="tool">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/></svg>
+            Map view
+          </button>
+        </div>
+      </div>
+
+      <div class="grid">
+        <article class="card wide land">
+          <div class="ph">
+            <img src="https://picsum.photos/seed/singer-ed-1/900/720" alt="A vintage Singer sewing machine on a workbench" />
+            <button class="save" aria-label="Save"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+            <span class="vouched"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1 3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>Vouched · 5</span>
+          </div>
+          <div class="meta-row">
+            <span class="who">Bastian R. · Grangetown</span>
+            <span class="price">2-week loan</span>
+          </div>
+          <h3>Singer 401A, takes denim like butter.</h3>
+          <div class="wants"><span class="arrow"></span><span>Wants <b>4 hours of garden weeding</b> · this Saturday or next</span></div>
+          <div class="footline">
+            <span class="v"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/></svg>5 mutual vouches</span>
+            <span>0.8 mi</span>
+          </div>
+        </article>
+
+        <article class="card tall">
+          <div class="ph">
+            <img src="https://picsum.photos/seed/espresso-ed-1/600/800" alt="A La Pavoni espresso machine pulling a shot" />
+            <button class="save on" aria-label="Saved"><svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+          </div>
+          <div class="meta-row">
+            <span class="who">Soraya K. · Roath</span>
+            <span class="price">2 hr session</span>
+          </div>
+          <h3>Espresso, the way it should be.</h3>
+          <div class="wants"><span class="arrow"></span><span>Wants <b>Hebrew conversation</b>, 45 min weekly</span></div>
+          <div class="footline">
+            <span class="v"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1 3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>Guest favourite</span>
+            <span>0.5 mi</span>
+          </div>
+        </article>
+
+        <article class="card sq">
+          <div class="ph">
+            <img src="https://picsum.photos/seed/mandarin-ed-1/700/700" alt="A notebook with handwritten Mandarin characters" />
+            <button class="save" aria-label="Save"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+          </div>
+          <div class="meta-row">
+            <span class="who">Priya R. · Plasnewydd</span>
+            <span class="price">Weekly hour</span>
+          </div>
+          <h3>Mandarin, native speaker.</h3>
+          <div class="wants"><span class="arrow"></span><span>Wants <b>help moving an upright piano</b></span></div>
+          <div class="footline">
+            <span class="v"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1 3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>Vouched · 7</span>
+            <span>0.2 mi</span>
+          </div>
+        </article>
+
+        <article class="card tall">
+          <div class="ph">
+            <img src="https://picsum.photos/seed/pottery-ed-1/600/800" alt="Hands at a pottery wheel" />
+            <button class="save" aria-label="Save"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+          </div>
+          <div class="meta-row">
+            <span class="who">Ezekiel O. · Splott</span>
+            <span class="price">Up to 3 kg</span>
+          </div>
+          <h3>Pottery wheel + kiln slot.</h3>
+          <div class="wants"><span class="arrow"></span><span>Wants <b>bike tune-up</b>, derailleur skipping under load</span></div>
+          <div class="footline">
+            <span class="v"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/></svg>4 mutual vouches</span>
+            <span>0.9 mi</span>
+          </div>
+        </article>
+
+        <article class="card sq">
+          <div class="ph">
+            <img src="https://picsum.photos/seed/crashpad-ed-1/700/700" alt="A bouldering crash pad against a brick wall" />
+            <button class="save" aria-label="Save"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+            <span class="vouched"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1 3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>Superneighbour</span>
+          </div>
+          <div class="meta-row">
+            <span class="who">Theo K. · Cathays</span>
+            <span class="price">Weekend loan</span>
+          </div>
+          <h3>Bouldering crash pad, no foam compression.</h3>
+          <div class="wants"><span class="arrow"></span><span>Wants <b>a cooked dinner</b>, vegetarian</span></div>
+          <div class="footline">
+            <span class="v"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1 3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>Vouched · 9</span>
+            <span>1.1 mi</span>
+          </div>
+        </article>
+
+        <article class="card wide land">
+          <div class="ph">
+            <img src="https://picsum.photos/seed/zoom-ed-1/900/720" alt="A Zoom F3 field recorder with microphone pair" />
+            <button class="save" aria-label="Save"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+          </div>
+          <div class="meta-row">
+            <span class="who">Anaïs T. · Riverside</span>
+            <span class="price">Weekend rig</span>
+          </div>
+          <h3>Zoom F3 + DPA pair, charger and windshield.</h3>
+          <div class="wants"><span class="arrow"></span><span>Wants <b>a portrait sitting on 35 mm</b>, prints OK</span></div>
+          <div class="footline">
+            <span class="v"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/></svg>3 mutual vouches</span>
+            <span>1.4 mi</span>
+          </div>
+        </article>
+
+        <article class="card sq">
+          <div class="ph">
+            <img src="https://picsum.photos/seed/cargo-ed-1/700/700" alt="A cargo bike parked by a hedge" />
+            <button class="save" aria-label="Save"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+          </div>
+          <div class="meta-row">
+            <span class="who">Cosima V. · Canton</span>
+            <span class="price">Half-day</span>
+          </div>
+          <h3>Cargo bike, child seat fitted.</h3>
+          <div class="wants"><span class="arrow"></span><span>Wants <b>dog-walking</b>, two evenings</span></div>
+          <div class="footline">
+            <span class="v"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1 3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>Superneighbour</span>
+            <span>2.0 mi</span>
+          </div>
+        </article>
+
+        <article class="card tall">
+          <div class="ph">
+            <img src="https://picsum.photos/seed/projector-ed-1/600/800" alt="A vintage 16mm projector on a table" />
+            <button class="save" aria-label="Save"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+          </div>
+          <div class="meta-row">
+            <span class="who">Yusuf D. · Cathays</span>
+            <span class="price">Weekend</span>
+          </div>
+          <h3>16mm projector, 2 spare bulbs included.</h3>
+          <div class="wants"><span class="arrow"></span><span>Wants <b>a dinner-party invite</b>, table for 6</span></div>
+          <div class="footline">
+            <span class="v"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1 3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>Guest favourite</span>
+            <span>1.0 mi</span>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ MANIFESTO — How trust works ============ -->
+  <section class="manifesto">
+    <div class="wrap">
+      <div class="manifesto-head">
+        <div class="folio">
+          <span class="num">02</span>
+          <span>How esharevice keeps every trade honest</span>
+          <span class="rule"></span>
+          <span>The ledger, in plain language</span>
+        </div>
+        <h2>No money changes hands — so the <i>only</i> currency is your word.</h2>
+      </div>
+
+      <div class="manifesto-grid">
+        <div class="stanza">
+          <div class="num">01</div>
+          <div>
+            <h3>Vouched, not anonymous.</h3>
+            <p>Every account is vouched for by a neighbour already on the platform. Three back-outs and your listings dim until you reach out and apologise.</p>
+            <div class="annot"><b>1,247</b> active members · <b>4,816</b> vouches issued</div>
+          </div>
+        </div>
+        <div class="stanza">
+          <div class="num">02</div>
+          <div>
+            <h3>The ledger keeps the receipts.</h3>
+            <p>Every proposal, counter-offer, and "we're square" lives on a thread you can both look back on. No verbal agreements lost to memory.</p>
+            <div class="annot"><b>0</b> disputes lost to "he said / she said" — that's the whole point</div>
+          </div>
+        </div>
+        <div class="stanza">
+          <div class="num">03</div>
+          <div>
+            <h3>A dispute gets a neighbour, not a bot.</h3>
+            <p>If a trade goes sideways, a third neighbour you've both traded with is asked to weigh in. No support ticket, no scripted reply.</p>
+            <div class="annot">Median resolution time: <b>3 days · 4 hr 12 min</b></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ MAP + NEIGHBOURHOODS ============ -->
+  <section class="map-sec">
+    <div class="wrap">
+      <div class="folio" style="margin-bottom:36px">
+        <span class="num">03</span>
+        <span>Where the trades are happening</span>
+        <span class="rule"></span>
+        <span>Updated every 60 seconds</span>
+      </div>
+
+      <div class="map-grid">
+        <div class="map-art" aria-hidden="true">
+          <div class="layer"></div>
+          <div class="grid-lines"></div>
+          <div class="iso"></div>
+
+          <span class="pin" style="top:48%; left:30%"></span>
+          <span class="pin b" style="top:38%; left:36%"></span>
+          <span class="pin c" style="top:55%; left:38%"></span>
+          <span class="pin" style="top:62%; left:62%"></span>
+          <span class="pin b" style="top:46%; left:68%"></span>
+          <span class="pin" style="top:34%; left:58%"></span>
+          <span class="pin c" style="top:70%; left:52%"></span>
+
+          <span class="label b" style="top:34%; left:36%">Pontcanna — 186</span>
+          <span class="label" style="top:58%; left:62%">Splott — 94</span>
+          <span class="label" style="top:48%; left:14%">Canton — 158</span>
+          <span class="label b" style="top:30%; left:52%">Roath — 241</span>
+
+          <span class="compass">N <b>↑</b></span>
+        </div>
+
+        <div class="map-side">
+          <h2>11 neighbourhoods <i>in Cardiff</i>. Bristol joins this autumn.</h2>
+          <div class="hoods">
+            <a href="#"><span class="nm">Pontcanna</span><span class="ct">186 · 0.3 mi</span></a>
+            <a href="#"><span class="nm">Roath</span><span class="ct">241 · 0.5 mi</span></a>
+            <a href="#"><span class="nm">Cathays</span><span class="ct">177 · 1.0 mi</span></a>
+            <a href="#"><span class="nm">Grangetown</span><span class="ct">132 · 0.8 mi</span></a>
+            <a href="#"><span class="nm">Canton</span><span class="ct">158 · 1.2 mi</span></a>
+            <a href="#"><span class="nm">Splott</span><span class="ct">94 · 1.6 mi</span></a>
+            <a href="#"><span class="nm">Riverside</span><span class="ct">119 · 1.4 mi</span></a>
+            <a href="#"><span class="nm">Plasnewydd</span><span class="ct">203 · 0.2 mi</span></a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PROVIDER BAND ============ -->
+  <section class="provider">
+    <div class="wrap">
+      <div class="provider-grid">
+        <div>
+          <div class="folio">
+            <span class="num">04</span>
+            <span>Become a provider</span>
+            <span class="rule"></span>
+            <span>It takes about three minutes</span>
+          </div>
+          <h2>Got something the street <i>could use?</i></h2>
+          <p>List a tool, a skill, an evening of your time. We'll match it with neighbours who'd trade something you actually want — not money, not points, just a fair swap on your own terms.</p>
+          <div class="cta-row">
+            <a class="ln" href="#">List a trade</a>
+            <a class="ln2" href="#">See how it works →</a>
+          </div>
+        </div>
+        <div class="provider-side">
+          <div class="testimony">
+            <div class="quote">I listed an old Sewmor on a Tuesday. By Friday it was on Marisol's table and my hedge looked better than it had in three years.</div>
+            <div class="by"><b>Bastian R.</b> · Grangetown · member since '25</div>
+          </div>
+          <div class="testimony">
+            <div class="quote">Espresso lessons for 45 minutes of Hebrew, every week. Soraya is the best Tuesday of my month.</div>
+            <div class="by"><b>Anaïs T.</b> · Riverside · 16 trades</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ MOBILE PREVIEW ============ -->
+  <section class="mob-sec">
+    <div class="wrap">
+      <div class="mob-head">
+        <div class="folio">
+          <span class="num">05</span>
+          <span>On the phone, in your pocket</span>
+          <span class="rule"></span>
+          <span>iOS · Android · PWA</span>
+        </div>
+        <h2>The whole thing is built mobile-first — <i>most trades happen at the kitchen table</i>, not the desk.</h2>
+        <p>Sticky intent bar at the top, browse with one thumb, propose a trade in three taps. The "live ticker" and the trade-pair component carry through.</p>
+      </div>
+
+      <div class="phones">
+
+        <!-- Phone 1: home / browse -->
+        <div class="ph-1">
+          <div class="phone">
+            <div class="notch"></div>
+            <div class="screen">
+              <div class="m-status">
+                <span>9:41</span>
+                <span class="ic">
+                  <svg width="14" height="10" viewBox="0 0 14 10"><path d="M0 8h2v2H0zm3-2h2v4H3zm3-2h2v6H6zm3-2h2v8H9zm3-2h2v10h-2z" fill="currentColor"/></svg>
+                  <svg width="14" height="10" viewBox="0 0 18 12" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1 6a8 8 0 0 1 16 0"/><path d="M4 8a4.5 4.5 0 0 1 10 0"/><circle cx="9" cy="10" r="1" fill="currentColor"/></svg>
+                  <span style="font-family:var(--mono);font-size:9px">82%</span>
+                </span>
+              </div>
+              <div class="m-mast">
+                <span class="word">esharev<i>i</i>ce</span>
+                <span class="av">M</span>
+              </div>
+              <div class="m-hero">
+                <div class="eb"><span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--moss);margin-right:6px;vertical-align:middle;"></span>Live · <b>14 nearby</b></div>
+                <h1>Your street<br/>already <i>has it.</i></h1>
+              </div>
+              <div class="m-intent">
+                <div class="row">
+                  <div class="lbl">I need</div>
+                  <div class="val">A sewing machine, a long evening</div>
+                </div>
+                <div class="row">
+                  <div class="lbl">Near</div>
+                  <div class="val">Pontcanna · 0.5 mi</div>
+                </div>
+                <div class="row">
+                  <div class="lbl">I'll offer</div>
+                  <div class="val placeholder">Add what you bring</div>
+                </div>
+                <div class="go">Find a match</div>
+              </div>
+              <div class="m-chips">
+                <span class="m-chip on">All</span>
+                <span class="m-chip">Tools</span>
+                <span class="m-chip">Skills</span>
+                <span class="m-chip">Kitchen</span>
+                <span class="m-chip">Wheels</span>
+              </div>
+              <div class="m-pairs">
+                <article class="m-card">
+                  <div class="ph">
+                    <img src="https://picsum.photos/seed/singer-ed-2/500/600" alt=""/>
+                    <button class="save"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+                  </div>
+                  <div class="who">Bastian R. · Grangetown</div>
+                  <h3>Singer 401A, takes denim like butter.</h3>
+                  <div class="wants">Wants <b>4 hours of garden weeding</b></div>
+                </article>
+                <article class="m-card">
+                  <div class="ph">
+                    <img src="https://picsum.photos/seed/espresso-ed-2/500/600" alt=""/>
+                    <button class="save"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+                  </div>
+                  <div class="who">Soraya K. · Roath</div>
+                  <h3>Espresso, the way it should be.</h3>
+                  <div class="wants">Wants <b>Hebrew conversation</b>, 45 min weekly</div>
+                </article>
+              </div>
+              <div class="m-bottombar">
+                <div class="m-tab on">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 9l9-6 9 6v12H3z"/><path d="M9 21V12h6v9"/></svg>
+                  Browse
+                </div>
+                <div class="m-tab">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+                  Saved
+                </div>
+                <div class="m-tab fab">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+                </div>
+                <div class="m-tab">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+                  Inbox
+                </div>
+                <div class="m-tab">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+                  Me
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="phone-label">01 — Browse home</div>
+        </div>
+
+        <!-- Phone 2: item detail -->
+        <div class="ph-2">
+          <div class="phone">
+            <div class="notch"></div>
+            <div class="screen">
+              <div class="m-detail">
+                <div class="hero-ph">
+                  <img src="https://picsum.photos/seed/singer-ed-3/700/900" alt=""/>
+                  <button class="back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="m15 18-6-6 6-6"/></svg></button>
+                  <button class="save"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+                  <div class="dots"><span class="on"></span><span></span><span></span><span></span><span></span></div>
+                </div>
+                <div class="body">
+                  <div class="who-line">
+                    <div class="who">
+                      <span class="av">B</span>
+                      <span class="nm">Bastian R.<small>Grangetown · 1.2 mi</small></span>
+                    </div>
+                    <span class="vouch">★ Vouched 5</span>
+                  </div>
+                  <h2>Singer 401A, takes denim like butter.</h2>
+                  <div class="wants">
+                    <div class="lbl">He's looking for</div>
+                    <div class="val">4 hours of garden weeding — this Saturday or next.</div>
+                  </div>
+                  <div class="specs">
+                    <div class="s"><div class="l">Duration</div><div class="v">2-week loan</div></div>
+                    <div class="s"><div class="l">Pickup</div><div class="v">From his shed</div></div>
+                    <div class="s"><div class="l">Condition</div><div class="v">Serviced Mar '26</div></div>
+                    <div class="s"><div class="l">Includes</div><div class="v">Bobbins + thread</div></div>
+                  </div>
+                  <p class="desc">Cast-iron Singer that's been in the family since 1962. Handles denim, leather, canvas. Comes with the original foot pedal and a bag of bobbins. Drop-off in Grangetown after 4pm any weekday.</p>
+                </div>
+                <div class="actions">
+                  <button class="msg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></button>
+                  <div class="propose">Propose a trade →</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="phone-label">02 — Item detail</div>
+        </div>
+
+        <!-- Phone 3: propose-a-trade -->
+        <div class="ph-3">
+          <div class="phone">
+            <div class="notch"></div>
+            <div class="screen">
+              <div class="m-propose">
+                <div class="top">
+                  <button class="back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="m15 18-6-6 6-6"/></svg></button>
+                  <span class="ttl">Propose a trade</span>
+                  <span class="step">Step 1 of 2</span>
+                </div>
+                <h2>What will you<br/>offer <i>Bastian</i>?</h2>
+                <div class="their">
+                  <div class="pic"><img src="https://picsum.photos/seed/singer-ed-4/200/200" alt=""/></div>
+                  <div class="meta">
+                    <div class="role">He's offering</div>
+                    <div class="nm">Singer 401A · 2-week loan</div>
+                    <div class="by">In trade for 4 hours of garden weeding</div>
+                  </div>
+                </div>
+                <div class="you-label">Pick from your listings</div>
+                <div class="options">
+                  <label class="option on">
+                    <span class="radio"></span>
+                    <div class="meta">
+                      <div class="lbl">Garden weeding, 4 hours</div>
+                      <div class="det">Saturday or weekday eve · Pontcanna</div>
+                    </div>
+                    <div class="pic"><img src="https://picsum.photos/seed/garden-ed-1/200/200" alt=""/></div>
+                  </label>
+                  <label class="option">
+                    <span class="radio"></span>
+                    <div class="meta">
+                      <div class="lbl">Sourdough loaves, monthly</div>
+                      <div class="det">Drop-off — you collect Sundays</div>
+                    </div>
+                    <div class="pic"><img src="https://picsum.photos/seed/loaf-ed-1/200/200" alt=""/></div>
+                  </label>
+                </div>
+                <div class="add-new">+ Offer something new</div>
+                <div class="note">
+                  <div class="lbl">Note to Bastian</div>
+                  <textarea placeholder="Could pick up Friday after 5 — Mei-Lin says hi."></textarea>
+                </div>
+                <div class="footer-bar">
+                  <div class="submit">Send proposal →</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="phone-label">03 — Propose a trade</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ COLOFON / FOOTER ============ -->
+  <footer class="colofon">
+    <div class="wrap">
+      <div class="colofon-grid">
+        <div class="brand-side">
+          <span class="word">esharev<i>i</i>ce</span>
+          <p>A neighbour-owned co-op. Trades happen on your terms, the ledger is open, and the only currency is your word.</p>
+        </div>
+
+        <div>
+          <h5>The trade</h5>
+          <ul>
+            <li><a href="#">Browse nearby</a></li>
+            <li><a href="#">List a trade</a></li>
+            <li><a href="#">How the ledger works</a></li>
+            <li><a href="#">What we don't list</a></li>
+          </ul>
+        </div>
+        <div>
+          <h5>The platform</h5>
+          <ul>
+            <li><a href="#">The co-operative</a></li>
+            <li><a href="#">Trust + vouching</a></li>
+            <li><a href="#">Reporting a concern</a></li>
+            <li><a href="#">Open numbers</a></li>
+          </ul>
+        </div>
+        <div>
+          <h5>esharevice</h5>
+          <ul>
+            <li><a href="#">About</a></li>
+            <li><a href="#">Writing &amp; press</a></li>
+            <li><a href="#">Careers</a></li>
+            <li><a href="mailto:hello@esharevice.com">hello@esharevice.com</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="colo-bottom">
+        <span>© 2026 esharevice co-op · Cardiff</span>
+        <div class="legals">
+          <a href="#">Privacy</a>
+          <a href="#">Terms</a>
+          <a href="#">Cookies</a>
+          <a href="#">English (UK)</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>

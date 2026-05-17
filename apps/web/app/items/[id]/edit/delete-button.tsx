@@ -61,7 +61,7 @@ export function DeleteButton({ itemId }: { itemId: string }): React.ReactElement
       </Button>
       <Button
         type="button"
-        variant="secondary"
+        variant="ghost"
         size="sm"
         onClick={() => setArmed(false)}
         disabled={pending}

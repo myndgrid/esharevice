@@ -28,7 +28,7 @@ export function CreateItemForm(): React.ReactElement {
         <input
           name="provider"
           maxLength={120}
-          className="w-full rounded-md border border-border bg-bg-subtle px-3 py-2 text-sm text-fg outline-none focus:border-accent focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-bg"
+          className="w-full rounded-md border border-border bg-bg-subtle px-3 py-2 text-sm text-fg outline-none focus:border-brand focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-bg"
           required
         />
       </Field>
@@ -38,7 +38,7 @@ export function CreateItemForm(): React.ReactElement {
           name="service"
           maxLength={120}
           placeholder="e.g. Sourdough starter • Carpentry hour • Box of apples"
-          className="w-full rounded-md border border-border bg-bg-subtle px-3 py-2 text-sm text-fg placeholder:text-fg-subtle outline-none focus:border-accent focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-bg"
+          className="w-full rounded-md border border-border bg-bg-subtle px-3 py-2 text-sm text-fg placeholder:text-fg-subtle outline-none focus:border-brand focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-bg"
           required
         />
       </Field>
@@ -48,7 +48,7 @@ export function CreateItemForm(): React.ReactElement {
           name="exchange"
           maxLength={240}
           placeholder="e.g. A few free-range eggs • Help moving a sofa"
-          className="w-full rounded-md border border-border bg-bg-subtle px-3 py-2 text-sm text-fg placeholder:text-fg-subtle outline-none focus:border-accent focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-bg"
+          className="w-full rounded-md border border-border bg-bg-subtle px-3 py-2 text-sm text-fg placeholder:text-fg-subtle outline-none focus:border-brand focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-bg"
           required
         />
       </Field>
@@ -57,7 +57,7 @@ export function CreateItemForm(): React.ReactElement {
         <input
           name="date"
           type="date"
-          className="w-full rounded-md border border-border bg-bg-subtle px-3 py-2 text-sm text-fg outline-none focus:border-accent focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-bg"
+          className="w-full rounded-md border border-border bg-bg-subtle px-3 py-2 text-sm text-fg outline-none focus:border-brand focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-bg"
           required
         />
       </Field>
@@ -67,7 +67,7 @@ export function CreateItemForm(): React.ReactElement {
           name="description"
           maxLength={4000}
           rows={4}
-          className="w-full rounded-md border border-border bg-bg-subtle px-3 py-2 text-sm text-fg outline-none focus:border-accent focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-bg"
+          className="w-full rounded-md border border-border bg-bg-subtle px-3 py-2 text-sm text-fg outline-none focus:border-brand focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-bg"
           required
         />
       </Field>
@@ -77,7 +77,7 @@ export function CreateItemForm(): React.ReactElement {
           name="rate_type"
           maxLength={40}
           placeholder="e.g. per hour • per dozen • one-off"
-          className="w-full rounded-md border border-border bg-bg-subtle px-3 py-2 text-sm text-fg placeholder:text-fg-subtle outline-none focus:border-accent focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-bg"
+          className="w-full rounded-md border border-border bg-bg-subtle px-3 py-2 text-sm text-fg placeholder:text-fg-subtle outline-none focus:border-brand focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-bg"
         />
       </Field>
 
@@ -90,7 +90,7 @@ export function CreateItemForm(): React.ReactElement {
       )}
 
       <div className="flex items-center justify-end gap-2">
-        <Button type="submit" variant="primary" size="md" disabled={pending}>
+        <Button type="submit" variant="brand" size="md" disabled={pending}>
           {pending ? "Posting…" : "Post item"}
         </Button>
       </div>

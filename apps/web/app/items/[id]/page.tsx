@@ -94,17 +94,17 @@ export default async function ItemDetailPage({ params, searchParams }: Props): P
 
           <div className="flex flex-wrap items-center gap-2">
             <Link href="/">
-              <Button variant="secondary" size="sm">Back</Button>
+              <Button variant="ghost" size="sm">Back</Button>
             </Link>
             {!session && (
               <Link href={`/api/auth/login?return_to=${encodeURIComponent(`/items/${item.id}`)}`} prefetch={false}>
-                <Button variant="primary" size="sm">Sign in to reserve</Button>
+                <Button variant="brand" size="sm">Sign in to reserve</Button>
               </Link>
             )}
             {session && isOwner && (
               <>
                 <Link href={`/items/${item.id}/edit`}>
-                  <Button variant="secondary" size="sm">Edit</Button>
+                  <Button variant="ghost" size="sm">Edit</Button>
                 </Link>
                 <span className="text-xs text-fg-subtle">You posted this item.</span>
               </>

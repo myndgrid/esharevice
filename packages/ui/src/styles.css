@@ -1,85 +1,135 @@
 /* Design tokens — oklch palette, dark + light themes.
- * Consumed by apps/web globally; packages/ui components reference these CSS variables.
- * See tasks/2026-05-11_typescript-migration-and-redesign-plan.md §2.2.
+ *
+ * Source of truth for the e-Sharevice marketplace visual system.
+ * Brand colours are pulled directly from apps/web/app/icon.svg:
+ *   • Sky-500   #0EA5E9  → primary brand
+ *   • Amber-500 #F59E0B  → secondary accent
+ * Surfaces + text follow Airbnb's neutral spec so the marketplace
+ * structure feels familiar; the duo identity is what makes it ours.
+ *
+ * Consumed by apps/web globally; packages/ui components reference
+ * these CSS variables. The @theme block in apps/web/app/globals.css
+ * exposes them to Tailwind so utilities like `bg-brand`, `text-fg-muted`,
+ * `bg-accent-soft` map to these tokens automatically.
+ *
+ * Plan: tasks/2026-05-16_premium-marketplace-redesign-plan.md
+ *       §Visual System — Source of Truth + §Token Migration.
  */
 
 :root {
-  /* Surfaces */
-  --bg: oklch(99% 0 0);
+  /* ─── Surfaces ─── */
+  --bg: oklch(100% 0 0); /* #ffffff */
   --bg-elevated: oklch(100% 0 0);
-  --bg-subtle: oklch(96% 0.005 250);
+  --bg-subtle: oklch(97% 0 0); /* #f7f7f7 section bands, message bubble incoming */
+  --bg-soft: oklch(93.5% 0 0); /* #ebebeb image placeholder, subtle hover */
 
-  /* Foreground */
-  --fg: oklch(20% 0.02 260);
-  --fg-muted: oklch(45% 0.02 260);
-  /* WCAG AA needs >= 4.5:1 vs --bg for normal text. 58% L was 4.16:1
-     (verified via Lighthouse 2026-05-16); 48% reads at ~5.4:1. */
-  --fg-subtle: oklch(48% 0.02 260);
+  /* ─── Text ─── */
+  --fg: oklch(20% 0 0); /* #222222 primary */
+  --fg-muted: oklch(47% 0 0); /* #717171 — 4.6:1 AA on white */
+  --fg-subtle: oklch(72% 0 0); /* #b0b0b0 — only on bg-subtle */
 
-  /* Borders */
-  --border: oklch(90% 0.01 260);
-  --border-strong: oklch(78% 0.015 260);
+  /* ─── Borders ─── */
+  --border: oklch(89% 0 0); /* #dddddd dividers, card outlines */
+  --border-strong: oklch(72% 0 0); /* #b0b0b0 */
 
-  /* Accent — calm teal, single source of emphasis.
-     63% L paired with white text was 3.12:1 (fail). 50% L pulls the
-     accent darker so the white --accent-fg meets ~4.7:1 AA on
-     accent-painted buttons. */
-  --accent: oklch(50% 0.14 195);
-  --accent-fg: oklch(99% 0 0);
+  /* ─── Brand: SKY-500 from icon.svg (rgb 14,165,233) ─── */
+  --brand: oklch(70.5% 0.16 230); /* #0EA5E9 sky-500 */
+  --brand-h: oklch(60% 0.155 230); /* #0284C7 sky-600 — hover */
+  --brand-p: oklch(51% 0.135 230); /* #0369A1 sky-700 — pressed */
+  --brand-deep: oklch(45% 0.115 235); /* #075985 sky-800 — text-on-soft */
+  --brand-soft: oklch(95% 0.025 220); /* #E0F2FE sky-100 — focus fill, selected bg */
+  --brand-fg: oklch(100% 0 0); /* white text on solid brand */
+  --brand-grad: linear-gradient(
+    135deg,
+    oklch(77% 0.135 225) 0%,
+    /* #38BDF8 sky-400 */ oklch(70.5% 0.16 230) 50%,
+    /* #0EA5E9 sky-500 */ oklch(51% 0.135 230) 100% /* #0369A1 sky-700 */
+  );
 
-  /* Feedback */
+  /* ─── Accent: AMBER-500 from icon.svg (rgb 245,158,11) ─── */
+  --accent: oklch(75% 0.165 65); /* #F59E0B amber-500 */
+  --accent-h: oklch(68% 0.165 50); /* #D97706 amber-600 */
+  --accent-soft: oklch(96.5% 0.06 95); /* #FEF3C7 amber-100 — Free pill bg */
+  --accent-fg: oklch(20% 0 0); /* #222 — dark text on amber-soft */
+
+  /* ─── Feedback ─── */
   --danger: oklch(58% 0.22 25);
   --success: oklch(63% 0.16 145);
-  --ring: oklch(63% 0.13 195 / 0.4);
+  --warning: oklch(75% 0.16 65); /* shares accent hue */
+  --ring: oklch(70.5% 0.16 230 / 0.4); /* blue ring per plan */
 
-  /* Radii + shadows */
-  --radius-sm: 6px;
+  /* ─── Radii + shadows (Airbnb scale) ─── */
+  --radius-sm: 8px;
   --radius-md: 10px;
-  --radius-lg: 14px;
+  --radius-lg: 12px;
   --radius-full: 9999px;
-  --shadow-1: 0 1px 2px oklch(20% 0.02 260 / 0.04), 0 1px 1px oklch(20% 0.02 260 / 0.02);
-  --shadow-2: 0 4px 16px oklch(20% 0.02 260 / 0.06);
+  --shadow-1: 0 1px 2px oklch(20% 0 0 / 0.04), 0 1px 1px oklch(20% 0 0 / 0.02);
+  --shadow-2: 0 4px 16px oklch(20% 0 0 / 0.06);
 
   color-scheme: light;
 }
 
 [data-theme="dark"] {
-  --bg: oklch(15% 0.015 260);
-  --bg-elevated: oklch(18% 0.018 260);
-  --bg-subtle: oklch(22% 0.02 260);
-  --fg: oklch(96% 0.005 260);
-  --fg-muted: oklch(72% 0.015 260);
-  /* On dark bg (15% L), 58% L gave only ~3.0:1 — under AA. Lift to 68% for ~5.0:1. */
-  --fg-subtle: oklch(68% 0.02 260);
-  --border: oklch(28% 0.02 260);
-  --border-strong: oklch(38% 0.025 260);
-  --accent: oklch(72% 0.13 195);
-  --accent-fg: oklch(15% 0.015 260);
+  --bg: oklch(15% 0 0);
+  --bg-elevated: oklch(18% 0 0);
+  --bg-subtle: oklch(20% 0 0);
+  --bg-soft: oklch(24% 0 0);
+  --fg: oklch(96% 0 0);
+  --fg-muted: oklch(72% 0 0);
+  --fg-subtle: oklch(55% 0 0);
+  --border: oklch(28% 0 0);
+  --border-strong: oklch(40% 0 0);
+
+  /* Lifted brand for AA on dark bg */
+  --brand: oklch(76% 0.155 228);
+  --brand-h: oklch(80% 0.15 228);
+  --brand-p: oklch(72% 0.16 230);
+  --brand-deep: oklch(85% 0.1 230); /* swap deep for light on dark */
+  --brand-soft: oklch(28% 0.05 230);
+  --brand-fg: oklch(15% 0 0);
+
+  /* Lifted accent for AA */
+  --accent: oklch(80% 0.16 70);
+  --accent-h: oklch(84% 0.155 70);
+  --accent-soft: oklch(28% 0.05 70);
+  --accent-fg: oklch(15% 0 0);
+
   --danger: oklch(70% 0.2 25);
   --success: oklch(72% 0.16 145);
-  --ring: oklch(72% 0.13 195 / 0.5);
+  --warning: oklch(80% 0.16 70);
+  --ring: oklch(76% 0.155 228 / 0.45);
   --shadow-1: none;
-  --shadow-2: 0 0 0 1px oklch(28% 0.02 260);
+  --shadow-2: 0 0 0 1px oklch(28% 0 0);
   color-scheme: dark;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
-    --bg: oklch(15% 0.015 260);
-    --bg-elevated: oklch(18% 0.018 260);
-    --bg-subtle: oklch(22% 0.02 260);
-    --fg: oklch(96% 0.005 260);
-    --fg-muted: oklch(72% 0.015 260);
-    --fg-subtle: oklch(58% 0.02 260);
-    --border: oklch(28% 0.02 260);
-    --border-strong: oklch(38% 0.025 260);
-    --accent: oklch(72% 0.13 195);
-    --accent-fg: oklch(15% 0.015 260);
+    --bg: oklch(15% 0 0);
+    --bg-elevated: oklch(18% 0 0);
+    --bg-subtle: oklch(20% 0 0);
+    --bg-soft: oklch(24% 0 0);
+    --fg: oklch(96% 0 0);
+    --fg-muted: oklch(72% 0 0);
+    --fg-subtle: oklch(55% 0 0);
+    --border: oklch(28% 0 0);
+    --border-strong: oklch(40% 0 0);
+    --brand: oklch(76% 0.155 228);
+    --brand-h: oklch(80% 0.15 228);
+    --brand-p: oklch(72% 0.16 230);
+    --brand-deep: oklch(85% 0.1 230);
+    --brand-soft: oklch(28% 0.05 230);
+    --brand-fg: oklch(15% 0 0);
+    --accent: oklch(80% 0.16 70);
+    --accent-h: oklch(84% 0.155 70);
+    --accent-soft: oklch(28% 0.05 70);
+    --accent-fg: oklch(15% 0 0);
     --danger: oklch(70% 0.2 25);
     --success: oklch(72% 0.16 145);
-    --ring: oklch(72% 0.13 195 / 0.5);
+    --warning: oklch(80% 0.16 70);
+    --ring: oklch(76% 0.155 228 / 0.45);
     --shadow-1: none;
-    --shadow-2: 0 0 0 1px oklch(28% 0.02 260);
+    --shadow-2: 0 0 0 1px oklch(28% 0 0);
     color-scheme: dark;
   }
 }
@@ -94,7 +144,7 @@
 }
 
 :focus-visible {
-  outline: 2px solid var(--ring);
+  outline: 2px solid var(--brand);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
 }

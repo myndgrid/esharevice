@@ -16,7 +16,7 @@ export function ReserveButton({ itemId }: { itemId: string }): React.ReactElemen
 
   return (
     <form action={formAction} className="contents">
-      <Button type="submit" variant="primary" size="sm" disabled={pending}>
+      <Button type="submit" variant="brand" size="sm" disabled={pending}>
         {pending ? "Reserving…" : "Reserve"}
       </Button>
       {state && !state.ok && (

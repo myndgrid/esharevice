@@ -32,9 +32,15 @@ export const users = pgTable(
   "users",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    // Authentik OIDC subject — stable per-identity. Source of truth for who the user is.
+    // OIDC subject — stable per-identity. Source of truth for who the user is.
+    // Auth.js issues provider-prefixed subs (`google:1234…`, `email:user@…`);
+    // Authentik issues plain stable IDs. Both formats coexist here.
     oidc_sub: text("oidc_sub").notNull(),
     email: citext("email").notNull(),
+    // bcrypt hash for the Auth.js Credentials provider. NULL for every user
+    // signed in via a social/OIDC path — those rows never run a password check.
+    // Set server-side via bcrypt.hash(password, 12); never trust the client.
+    password_hash: text("password_hash"),
     first_name: text("first_name").notNull(),
     last_name: text("last_name").notNull(),
     postal_code: text("postal_code"),

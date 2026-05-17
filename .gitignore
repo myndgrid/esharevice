@@ -82,3 +82,4 @@ drizzle/migrations.json
 # Repo/ contains the legacy JS apps. It is kept for reference but is NOT part of the monorepo.
 # Comment the next line out if you ever want to vendor these into the workspace.
 Repo/
+YCombinator/

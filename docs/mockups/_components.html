@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>esharevice — Component QA</title>
+  <meta name="description" content="Visual QA for the marketplace UI primitives shipped in PR 5." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    /* Tokens — match packages/ui/src/styles.css (HEX equivalents for the OKLCH set). */
+    :root {
+      --bg:        #ffffff;
+      --bg-subtle: #f7f7f7;
+      --bg-soft:   #ebebeb;
+      --fg:        #222222;
+      --fg-muted:  #717171;
+      --fg-subtle: #b0b0b0;
+      --border:        #dddddd;
+      --border-strong: #b0b0b0;
+      --brand:       #0EA5E9;
+      --brand-h:     #0284C7;
+      --brand-p:     #0369A1;
+      --brand-deep:  #075985;
+      --brand-soft:  #E0F2FE;
+      --brand-fg:    #ffffff;
+      --accent:      #F59E0B;
+      --accent-h:    #D97706;
+      --accent-soft: #FEF3C7;
+      --accent-fg:   #222222;
+      --danger:      #DC2626;
+      --success:     #16A34A;
+      --ring:        rgba(14, 165, 233, 0.4);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      color: var(--fg);
+      background: var(--bg);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    main { max-width: 1080px; margin: 0 auto; padding: 48px 24px 120px; }
+    h1 { font-size: 32px; font-weight: 700; margin: 0 0 8px; }
+    h2 { font-size: 20px; font-weight: 600; margin: 56px 0 8px; padding-top: 24px; border-top: 1px solid var(--border); }
+    h2:first-of-type { border-top: none; padding-top: 0; }
+    p.lead { font-size: 15px; color: var(--fg-muted); margin: 0 0 32px; }
+    .section-desc { font-size: 13px; color: var(--fg-muted); margin: 0 0 16px; }
+    .row { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; padding: 16px; background: var(--bg-subtle); border-radius: 12px; }
+    .row.col { flex-direction: column; align-items: stretch; }
+    .row.no-bg { background: transparent; padding: 0; }
+
+    /* Heart */
+    .heart-btn { display: inline-flex; align-items: center; justify-content: center; border: none; background: transparent; cursor: pointer; transition: transform 150ms; }
+    .heart-btn:hover { transform: scale(1.1); }
+    .heart-saved svg { fill: var(--accent); stroke: var(--accent); }
+    .heart-unsaved svg { fill: none; stroke: currentColor; stroke-width: 2; }
+
+    /* RatingStar */
+    .rating { display: inline-flex; align-items: center; gap: 4px; font-size: 14px; color: var(--fg); }
+    .rating .count { color: var(--fg-muted); }
+
+    /* TypeBadge */
+    .type-badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 600; }
+    .type-badge.gift, .type-badge.hire { background: var(--accent-soft); color: var(--accent-fg); }
+    .type-badge.trade { background: var(--brand-soft); color: var(--brand-deep); }
+    .type-badge.neutral { background: var(--bg-subtle); color: var(--fg); }
+
+    /* StatusPill */
+    .status-pill { display: inline-flex; align-items: center; border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 500; }
+    .status-pill.requested { background: var(--bg-subtle); color: var(--fg-muted); }
+    .status-pill.confirmed { background: var(--brand-soft); color: var(--brand-deep); }
+    .status-pill.active    { background: #d4f3df; color: #156A2E; }
+    .status-pill.returned  { background: var(--accent-soft); color: var(--accent-fg); }
+    .status-pill.completed { border: 1px solid var(--border); color: var(--fg-muted); }
+    .status-pill.cancelled { border: 1px solid var(--danger); color: var(--danger); }
+
+    /* BecomeBand */
+    .become-band {
+      position: relative; isolation: isolate; overflow: hidden;
+      border-radius: 16px; border: 1px solid var(--border);
+      background: var(--bg);
+      padding: 32px;
+    }
+    .become-band::before {
+      content: ""; position: absolute; inset: 0; z-index: -1; opacity: 0.18;
+      background: linear-gradient(135deg, var(--brand) 0%, var(--brand-soft) 45%, var(--accent-soft) 75%, var(--accent) 100%);
+    }
+    .become-band .title { font-size: 22px; font-weight: 600; margin: 0; }
+    .become-band .desc { font-size: 15px; color: var(--fg-muted); margin: 4px 0 0; }
+    .become-band-content { display: flex; gap: 32px; align-items: center; justify-content: space-between; }
+
+    /* Buttons (composable) */
+    .btn { display: inline-flex; align-items: center; justify-content: center; height: 44px; padding: 0 16px; border-radius: 6px; font-weight: 500; font-size: 14px; cursor: pointer; border: 1px solid transparent; transition: 150ms; }
+    .btn-brand { background: var(--brand); color: var(--brand-fg); border-color: var(--brand); }
+    .btn-brand:hover { background: var(--brand-h); border-color: var(--brand-h); }
+    .btn-ghost { background: var(--bg); color: var(--fg); border-color: var(--border); }
+    .btn-ghost:hover { background: var(--bg-subtle); border-color: var(--border-strong); }
+    .btn-link { background: transparent; color: var(--brand); border: none; padding: 0; text-decoration: underline; }
+
+    /* SearchPill */
+    .search-pill { display: inline-flex; height: 64px; max-width: 100%; align-items: stretch; overflow: hidden; border-radius: 999px; border: 1px solid var(--border); background: var(--bg); box-shadow: 0 4px 18px -6px rgba(0,0,0,0.08); }
+    .search-segment { display: inline-flex; flex-direction: column; justify-content: center; padding: 0 24px; cursor: pointer; transition: background 150ms; }
+    .search-segment:hover { background: var(--bg-subtle); }
+    .search-segment .label { font-size: 12px; font-weight: 600; }
+    .search-segment .value { font-size: 14px; color: var(--fg-muted); margin-top: 2px; }
+    .search-segment .placeholder { color: var(--fg-subtle); }
+    .search-divider { width: 1px; margin: 12px 0; background: var(--border); align-self: stretch; }
+    .search-go { margin: 8px 8px 8px 0; display: inline-flex; align-items: center; justify-content: center; height: 48px; width: 48px; border-radius: 999px; background: var(--brand); color: var(--brand-fg); border: none; cursor: pointer; }
+
+    /* MobileSearchPill */
+    .mobile-search { display: inline-flex; height: 56px; width: 100%; max-width: 400px; align-items: center; gap: 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--bg); padding: 0 16px; box-shadow: 0 2px 10px -4px rgba(0,0,0,0.08); }
+    .mobile-search .text { display: flex; flex-direction: column; align-items: flex-start; flex: 1; min-width: 0; }
+    .mobile-search .primary { font-size: 14px; font-weight: 600; }
+    .mobile-search .secondary { font-size: 12px; color: var(--fg-muted); }
+
+    /* CategoryStrip */
+    .cat-strip { border-bottom: 1px solid var(--border); width: 100%; }
+    .cat-inner { display: flex; align-items: flex-end; gap: 28px; padding: 12px 16px 8px; overflow-x: auto; scrollbar-width: none; }
+    .cat-inner::-webkit-scrollbar { display: none; }
+    .cat-tab { display: inline-flex; flex-direction: column; align-items: center; gap: 4px; padding-bottom: 4px; font-size: 12px; color: var(--fg-muted); border-bottom: 2px solid transparent; cursor: pointer; flex-shrink: 0; }
+    .cat-tab.active { color: var(--brand-deep); border-bottom-color: var(--brand); margin-bottom: -1px; }
+    .cat-icon { width: 24px; height: 24px; }
+
+    /* ListingTypeChips */
+    .chips { display: flex; gap: 8px; padding: 12px 0; flex-wrap: wrap; }
+    .chip { display: inline-flex; height: 36px; align-items: center; border-radius: 999px; padding: 0 16px; font-size: 14px; font-weight: 500; border: 1px solid var(--border); background: var(--bg); color: var(--fg); cursor: pointer; }
+    .chip:hover { border-color: var(--border-strong); background: var(--bg-subtle); }
+    .chip.active { background: var(--brand-soft); color: var(--brand-deep); border-color: var(--brand); }
+
+    /* LiveCard */
+    .live-card { display: inline-flex; width: 280px; align-items: center; gap: 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg); padding: 12px; }
+    .live-card .avatar { width: 32px; height: 32px; border-radius: 999px; background: var(--brand-soft); display: inline-flex; align-items: center; justify-content: center; color: var(--brand-deep); font-weight: 600; flex-shrink: 0; }
+    .live-card .text { min-width: 0; flex: 1; }
+    .live-card .line { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .live-card .meta { font-size: 12px; color: var(--fg-muted); margin-top: 2px; }
+
+    /* HoodTile */
+    .hood { display: inline-flex; align-items: center; gap: 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg); padding: 12px; text-decoration: none; color: var(--fg); }
+    .hood .thumb { width: 64px; height: 64px; border-radius: 8px; background: var(--bg-soft); }
+    .hood .name { font-size: 14px; font-weight: 600; }
+    .hood .count { font-size: 12px; color: var(--fg-muted); }
+
+    /* MobileTabBar */
+    .tab-bar { display: flex; width: 360px; border-top: 1px solid var(--border); background: rgba(255,255,255,0.95); backdrop-filter: blur(8px); }
+    .tab { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 0; font-size: 12px; color: var(--fg-muted); }
+    .tab.active { color: var(--brand-deep); }
+    .tab-icon { width: 24px; height: 24px; position: relative; }
+    .tab-badge { position: absolute; top: -4px; right: -6px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: var(--brand); color: var(--brand-fg); font-size: 10px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
+
+    /* TrustSignalsRow */
+    .trust { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 14px; color: var(--fg-muted); }
+    .verified { display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; background: var(--brand-soft); color: var(--brand-deep); padding: 2px 8px; font-size: 12px; font-weight: 600; }
+
+    /* TypeWizardCard */
+    .type-card { display: inline-flex; width: 280px; flex-direction: column; align-items: flex-start; gap: 12px; border-radius: 16px; border: 1px solid var(--border); background: var(--bg); padding: 20px; text-align: left; cursor: pointer; transition: 150ms; }
+    .type-card:hover { border-color: var(--border-strong); transform: translateY(-2px); box-shadow: 0 8px 24px -12px rgba(0,0,0,0.2); }
+    .type-card.selected { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand); }
+    .type-card-icon { width: 48px; height: 48px; border-radius: 12px; background: var(--bg-subtle); display: inline-flex; align-items: center; justify-content: center; }
+    .type-card.selected .type-card-icon { background: var(--brand-soft); color: var(--brand-deep); }
+    .type-card-title { font-size: 16px; font-weight: 600; margin: 0; }
+    .type-card-desc { font-size: 14px; color: var(--fg-muted); margin: 4px 0 0; }
+    .type-card-example { font-size: 12px; font-style: italic; color: var(--fg-subtle); }
+
+    /* PriceBreakdown */
+    .pb { border-radius: 8px; border: 1px solid var(--border); width: 320px; }
+    .pb-summary { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .pb-details { padding: 12px; font-size: 14px; border-top: 1px solid var(--border); }
+    .pb-row { display: flex; justify-content: space-between; margin-bottom: 6px; }
+    .pb-row.muted { color: var(--fg-muted); }
+    .pb-row.total { border-top: 1px solid var(--border); padding-top: 8px; margin-top: 8px; font-weight: 600; color: var(--fg); }
+
+    /* StatusTimeline */
+    .timeline { display: flex; align-items: center; width: 600px; max-width: 100%; }
+    .timeline-step { display: flex; align-items: center; flex: 1; }
+    .timeline-step:first-child { flex: none; }
+    .timeline-line { height: 2px; flex: 1; background: var(--border); }
+    .timeline-line.done { background: var(--brand); }
+    .timeline-dot { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 999px; border: 1px solid var(--border); background: var(--bg); color: var(--fg-muted); font-size: 12px; font-weight: 600; }
+    .timeline-dot.done { background: var(--brand); color: var(--brand-fg); border-color: var(--brand); }
+    .timeline-dot.current { border: 2px solid var(--brand); color: var(--brand-deep); }
+    .timeline-label { font-size: 12px; margin-left: 8px; color: var(--fg-muted); }
+    .timeline-label.current { color: var(--fg); font-weight: 600; }
+    .timeline-cancelled { display: flex; align-items: center; gap: 8px; border-radius: 8px; border: 1px solid var(--danger); padding: 8px 12px; color: var(--danger); font-size: 14px; }
+
+    /* DurationPicker */
+    .duration { display: flex; gap: 8px; flex-wrap: wrap; }
+    .duration-chip { display: inline-flex; height: 40px; align-items: center; border-radius: 999px; padding: 0 16px; font-size: 14px; font-weight: 500; border: 1px solid var(--border); background: var(--bg); color: var(--fg); cursor: pointer; }
+    .duration-chip.active { border-color: var(--brand); background: var(--brand-soft); color: var(--brand-deep); }
+    .duration-custom { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--border); font-size: 14px; }
+    .duration-custom input { width: 56px; border: none; outline: none; background: transparent; text-align: center; font-size: 14px; }
+
+    /* ActionPanel card */
+    .action-card { width: 360px; border-radius: 16px; border: 1px solid var(--border); background: var(--bg); padding: 20px; box-shadow: 0 1px 4px -2px rgba(0,0,0,0.06); }
+    .action-card .price { display: flex; align-items: baseline; gap: 4px; }
+    .action-card .price-amount { font-size: 24px; font-weight: 600; }
+    .action-card .price-unit { font-size: 14px; color: var(--fg-muted); }
+    .action-card h3 { font-size: 18px; font-weight: 600; margin: 0; }
+    .action-card .meta { font-size: 14px; color: var(--fg-muted); margin-top: 4px; }
+    .action-card .actions { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+    .action-card .actions .btn { width: 100%; }
+    .blue-dot { display: inline-block; width: 8px; height: 8px; border-radius: 999px; background: var(--brand); margin-top: 6px; margin-right: 8px; vertical-align: top; }
+
+    /* Misc utilities for this page */
+    .placeholder-img { background: var(--bg-soft); display: block; width: 100%; height: 100%; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>esharevice — Component QA</h1>
+    <p class="lead">Visual reference for the 20 marketplace primitives shipped in PR 5. Open this file directly in a browser — no build step needed. Real React versions live in <code>packages/ui/src/</code>.</p>
+
+    <!-- HEART -->
+    <h2>Heart</h2>
+    <p class="section-desc">Save/unsave toggle. Amber-filled when saved.</p>
+    <div class="row">
+      <button class="heart-btn heart-unsaved" aria-label="Save"><svg width="24" height="24" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></button>
+      <button class="heart-btn heart-saved" aria-label="Saved"><svg width="24" height="24" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></button>
+    </div>
+
+    <!-- RATING STAR -->
+    <h2>RatingStar</h2>
+    <p class="section-desc">Airbnb-style: black star + 2-decimal value + optional review count.</p>
+    <div class="row">
+      <span class="rating"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .587l3.668 7.43 8.2 1.193-5.934 5.782 1.402 8.168L12 18.896l-7.336 3.864 1.402-8.168L.132 9.21l8.2-1.193z"/></svg>4.92</span>
+      <span class="rating"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .587l3.668 7.43 8.2 1.193-5.934 5.782 1.402 8.168L12 18.896l-7.336 3.864 1.402-8.168L.132 9.21l8.2-1.193z"/></svg>4.88<span class="count">(138)</span></span>
+    </div>
+
+    <!-- TYPE BADGE -->
+    <h2>TypeBadge</h2>
+    <p class="section-desc">"Free" / "Trade" / "Hire" pills. Rent + sell render <code>null</code> by default (their price suffix is self-labelling).</p>
+    <div class="row">
+      <span class="type-badge gift">Free</span>
+      <span class="type-badge trade">Trade</span>
+      <span class="type-badge hire">Hire</span>
+      <span class="type-badge neutral">Rent (always)</span>
+      <span class="type-badge neutral">For sale (always)</span>
+    </div>
+
+    <!-- STATUS PILL -->
+    <h2>StatusPill</h2>
+    <p class="section-desc">Booking lifecycle status pills.</p>
+    <div class="row">
+      <span class="status-pill requested">Requested</span>
+      <span class="status-pill confirmed">Confirmed</span>
+      <span class="status-pill active">Active</span>
+      <span class="status-pill returned">Returned</span>
+      <span class="status-pill completed">Completed</span>
+      <span class="status-pill cancelled">Cancelled</span>
+    </div>
+
+    <!-- BECOME BAND -->
+    <h2>BecomeBand</h2>
+    <p class="section-desc">Sky-amber duo-gradient call-to-action band that sits between listing grid and "Happening right now".</p>
+    <section class="become-band">
+      <div class="become-band-content">
+        <div>
+          <p class="title">Become a provider</p>
+          <p class="desc">List the tools, kitchen gear, or services your neighbours already use. Free to start.</p>
+        </div>
+        <button class="btn btn-brand">Get started</button>
+      </div>
+    </section>
+
+    <!-- SEARCH PILL -->
+    <h2>SearchPill</h2>
+    <p class="section-desc">Split-pill hero search: <code>[What | Where | When | 🔎]</code>. Each segment opens its own picker.</p>
+    <div class="row">
+      <div class="search-pill">
+        <button class="search-segment" type="button">
+          <span class="label">What</span><span class="value placeholder">Any category</span>
+        </button>
+        <span class="search-divider"></span>
+        <button class="search-segment" type="button">
+          <span class="label">Where</span><span class="value">St. Lawrence</span>
+        </button>
+        <span class="search-divider"></span>
+        <button class="search-segment" type="button">
+          <span class="label">When</span><span class="value placeholder">Any time</span>
+        </button>
+        <button class="search-go" type="button" aria-label="Search">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- MOBILE SEARCH PILL -->
+    <h2>MobileSearchPill</h2>
+    <p class="section-desc">Sticky top search bar for mobile. Tap opens the full search experience.</p>
+    <div class="row">
+      <button class="mobile-search" type="button">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <span class="text">
+          <span class="primary">Search anything</span>
+          <span class="secondary">Anytime · Any type</span>
+        </span>
+      </button>
+    </div>
+
+    <!-- CATEGORY STRIP -->
+    <h2>CategoryStrip</h2>
+    <p class="section-desc">Horizontal-scroll category nav. Active tab gets a brand-coloured underline. Sticky from <code>top: 82px</code> in the live UI.</p>
+    <div class="row no-bg">
+      <div class="cat-strip">
+        <div class="cat-inner">
+          <button class="cat-tab active"><svg class="cat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="9" width="18" height="12" rx="2"/><path d="M9 9V5a3 3 0 0 1 6 0v4"/></svg>Tools</button>
+          <button class="cat-tab"><svg class="cat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><line x1="3" y1="12" x2="21" y2="12"/></svg>Kitchen</button>
+          <button class="cat-tab"><svg class="cat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>Outdoor</button>
+          <button class="cat-tab"><svg class="cat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><polygon points="12,3 22,21 2,21"/></svg>Sports</button>
+          <button class="cat-tab"><svg class="cat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 12h18M12 3v18"/></svg>Services</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- LISTING TYPE CHIPS -->
+    <h2>ListingTypeChips</h2>
+    <p class="section-desc">Single-select filter for listing types. Sticky-paired with CategoryStrip.</p>
+    <div class="row">
+      <div class="chips">
+        <button class="chip active">All</button>
+        <button class="chip">Free</button>
+        <button class="chip">Trade</button>
+        <button class="chip">Rent</button>
+        <button class="chip">Hire</button>
+        <button class="chip">For sale</button>
+      </div>
+    </div>
+
+    <!-- LIVE CARD -->
+    <h2>LiveCard</h2>
+    <p class="section-desc">"Happening right now in [city]" rail card. Horizontal carousel container expected.</p>
+    <div class="row">
+      <article class="live-card">
+        <span class="avatar">B</span>
+        <div class="text">
+          <div class="line"><strong>Bastian</strong> rented <strong>a KitchenAid mixer</strong></div>
+          <div class="meta">St. Lawrence · 12m ago</div>
+        </div>
+      </article>
+      <article class="live-card">
+        <span class="avatar">L</span>
+        <div class="text">
+          <div class="line"><strong>Lily</strong> traded <strong>a ski jacket</strong></div>
+          <div class="meta">Corktown · 1h ago</div>
+        </div>
+      </article>
+    </div>
+
+    <!-- HOOD TILE -->
+    <h2>HoodTile</h2>
+    <p class="section-desc">Neighbourhood discovery tile (64×64 thumb + name + count).</p>
+    <div class="row">
+      <a class="hood" href="#"><span class="thumb"></span><div><div class="name">St. Lawrence</div><div class="count">128 listings</div></div></a>
+      <a class="hood" href="#"><span class="thumb"></span><div><div class="name">Corktown</div><div class="count">94 listings</div></div></a>
+      <a class="hood" href="#"><span class="thumb"></span><div><div class="name">Distillery</div><div class="count">61 listings</div></div></a>
+    </div>
+
+    <!-- MOBILE TAB BAR -->
+    <h2>MobileTabBar</h2>
+    <p class="section-desc">5-tab bottom navigation for mobile. Caller is responsible for fixed positioning.</p>
+    <div class="row">
+      <nav class="tab-bar" aria-label="Primary">
+        <button class="tab active"><span class="tab-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12L12 4l9 8"/><path d="M5 11v8h14v-8"/></svg></span>Home</button>
+        <button class="tab"><span class="tab-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>Search</button>
+        <button class="tab"><span class="tab-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></span>Saved</button>
+        <button class="tab"><span class="tab-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span class="tab-badge">3</span></span>Inbox</button>
+        <button class="tab"><span class="tab-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v2"/></svg></span>Profile</button>
+      </nav>
+    </div>
+
+    <!-- TRUST SIGNALS ROW -->
+    <h2>TrustSignalsRow</h2>
+    <p class="section-desc">Profile/host-card row: rating · per-type completed counts · Verified pill.</p>
+    <div class="row col">
+      <div class="trust">
+        <span class="rating"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .587l3.668 7.43 8.2 1.193-5.934 5.782 1.402 8.168L12 18.896l-7.336 3.864 1.402-8.168L.132 9.21l8.2-1.193z"/></svg>4.92<span class="count">(138)</span></span>
+        <span><strong>12</strong> rented</span><span style="color: var(--fg-subtle)">·</span>
+        <span><strong>8</strong> sold</span><span style="color: var(--fg-subtle)">·</span>
+        <span><strong>3</strong> gifted</span>
+        <span class="verified">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
+          Verified
+        </span>
+      </div>
+    </div>
+
+    <!-- TYPE WIZARD CARD -->
+    <h2>TypeWizardCard</h2>
+    <p class="section-desc">Big-card type selector for the listing wizard step 1.</p>
+    <div class="grid">
+      <button class="type-card selected">
+        <span class="type-card-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="9" width="18" height="12" rx="2"/><path d="M9 9V5a3 3 0 0 1 6 0v4"/></svg></span>
+        <div>
+          <p class="type-card-title">Rent it out</p>
+          <p class="type-card-desc">Earn passive income on the things you own.</p>
+        </div>
+        <span class="type-card-example">e.g. lawn mower for the weekend</span>
+      </button>
+      <button class="type-card">
+        <span class="type-card-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h13"/><path d="M11 7l5 5-5 5"/></svg></span>
+        <div>
+          <p class="type-card-title">Sell something</p>
+          <p class="type-card-desc">One-time transaction, payouts in 7 days.</p>
+        </div>
+        <span class="type-card-example">e.g. a road bike you've outgrown</span>
+      </button>
+      <button class="type-card">
+        <span class="type-card-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></span>
+        <div>
+          <p class="type-card-title">Offer a service</p>
+          <p class="type-card-desc">Hourly rate, customers book by the day.</p>
+        </div>
+        <span class="type-card-example">e.g. dog-walking on weekdays</span>
+      </button>
+    </div>
+
+    <!-- PRICE BREAKDOWN -->
+    <h2>PriceBreakdown</h2>
+    <p class="section-desc">Itemised fee disclosure (CAD). Collapsible. The API computes the math; the component only renders.</p>
+    <div class="row">
+      <div class="pb">
+        <div class="pb-summary">
+          <span>Total</span><span>$46.26</span>
+        </div>
+        <div class="pb-details">
+          <div class="pb-row"><span>Subtotal</span><span>$40.00</span></div>
+          <div class="pb-row muted"><span>Platform fee</span><span>$4.80</span></div>
+          <div class="pb-row muted"><span>Processing fee</span><span>$1.46</span></div>
+          <div class="pb-row muted"><span>Deposit (refundable)</span><span>$25.00</span></div>
+          <div class="pb-row total"><span>Total</span><span>$46.26</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STATUS TIMELINE -->
+    <h2>StatusTimeline</h2>
+    <p class="section-desc">Booking lifecycle progress. Cancelled/declined collapse to a single red row.</p>
+    <div class="row col">
+      <ol class="timeline">
+        <li class="timeline-step"><span class="timeline-dot done"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span class="timeline-label">Requested</span></li>
+        <li class="timeline-step"><span class="timeline-line done"></span><span class="timeline-dot current">2</span><span class="timeline-label current">Confirmed</span></li>
+        <li class="timeline-step"><span class="timeline-line"></span><span class="timeline-dot">3</span><span class="timeline-label">Active</span></li>
+        <li class="timeline-step"><span class="timeline-line"></span><span class="timeline-dot">4</span><span class="timeline-label">Returned</span></li>
+        <li class="timeline-step"><span class="timeline-line"></span><span class="timeline-dot">5</span><span class="timeline-label">Completed</span></li>
+      </ol>
+      <div class="timeline-cancelled">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+        <span>Cancelled</span>
+      </div>
+    </div>
+
+    <!-- DURATION PICKER -->
+    <h2>DurationPicker</h2>
+    <p class="section-desc">Pill row for hire-booking duration. Custom input accepts hours (0.5–24).</p>
+    <div class="row">
+      <div class="duration">
+        <button class="duration-chip">1 h</button>
+        <button class="duration-chip active">2 h</button>
+        <button class="duration-chip">4 h</button>
+        <button class="duration-chip">Half day</button>
+        <button class="duration-chip">Full day</button>
+        <label class="duration-custom">
+          <span>Custom</span><input type="number" placeholder="hrs" />
+        </label>
+      </div>
+    </div>
+
+    <!-- DATE RANGE PICKER -->
+    <h2>DateRangePicker</h2>
+    <p class="section-desc">Calendar with disabled dates from <code>bookings</code>. Two-month desktop, one-month mobile. Real component imports <code>react-day-picker/style.css</code>.</p>
+    <div class="row">
+      <div style="font-size: 13px; color: var(--fg-muted);">See live React component — too much surface to hand-render statically. The wrapper applies brand-coloured class names to react-day-picker v10's structural slots.</div>
+    </div>
+
+    <!-- ACTION PANEL (5 RENDERERS) -->
+    <h2>ActionPanel — Gift</h2>
+    <p class="section-desc">Pickup-only, no money exchanged.</p>
+    <div class="row">
+      <aside class="action-card" data-type="gift">
+        <h3>Free</h3>
+        <p class="meta">Pickup only · Available now</p>
+        <div class="actions">
+          <button class="btn btn-brand">Request this</button>
+          <button class="btn btn-ghost">Message</button>
+        </div>
+      </aside>
+    </div>
+
+    <h2>ActionPanel — Trade</h2>
+    <p class="section-desc">Provider's wishlist + counter-offer entry point.</p>
+    <div class="row">
+      <aside class="action-card" data-type="trade">
+        <div style="display: flex; align-items: flex-start;">
+          <span class="blue-dot"></span>
+          <div>
+            <h3 style="font-size: 12px; text-transform: uppercase; color: var(--fg-muted); letter-spacing: 0.04em;">Wants</h3>
+            <p style="margin: 2px 0 0; font-size: 16px;">A waffle iron in good condition</p>
+            <p style="margin-top: 4px; font-size: 12px; color: var(--fg-muted);">Open to other offers</p>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-brand">Propose a trade</button>
+          <button class="btn btn-ghost">Message</button>
+        </div>
+      </aside>
+    </div>
+
+    <h2>ActionPanel — Rent</h2>
+    <p class="section-desc">Price per unit, date-range picker, live total.</p>
+    <div class="row">
+      <aside class="action-card" data-type="rent">
+        <div class="price"><span class="price-amount">$40.00</span><span class="price-unit">/ day</span></div>
+        <div style="margin-top: 16px; padding: 12px; background: var(--bg-subtle); border-radius: 8px; font-size: 13px; color: var(--fg-muted);">[react-day-picker calendar renders here]</div>
+        <div style="margin-top: 12px; display: flex; justify-content: space-between; font-size: 14px;"><span style="color: var(--fg-muted);">Total</span><strong>$120.00</strong></div>
+        <div class="actions">
+          <button class="btn btn-brand">Request to book</button>
+          <button class="btn btn-ghost">Message</button>
+        </div>
+      </aside>
+    </div>
+
+    <h2>ActionPanel — Hire</h2>
+    <p class="section-desc">Hourly rate + duration picker + live total.</p>
+    <div class="row">
+      <aside class="action-card" data-type="hire">
+        <div class="price"><span class="price-amount">$25.00</span><span class="price-unit">/ hr</span></div>
+        <div style="margin-top: 16px;">
+          <div class="duration">
+            <button class="duration-chip">1 h</button>
+            <button class="duration-chip active">2 h</button>
+            <button class="duration-chip">4 h</button>
+            <button class="duration-chip">Half day</button>
+          </div>
+        </div>
+        <div style="margin-top: 12px; display: flex; justify-content: space-between; font-size: 14px;"><span style="color: var(--fg-muted);">Total</span><strong>$50.00</strong></div>
+        <div class="actions">
+          <button class="btn btn-brand">Request to book</button>
+          <button class="btn btn-ghost">Message</button>
+        </div>
+      </aside>
+    </div>
+
+    <h2>ActionPanel — Sell</h2>
+    <p class="section-desc">One-time price + condition + pickup/shipping toggle.</p>
+    <div class="row">
+      <aside class="action-card" data-type="sell">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <span class="price-amount">$200.00</span>
+          <span class="type-badge neutral">Like new</span>
+        </div>
+        <div style="margin-top: 16px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); padding: 8px 0; font-size: 14px;">
+            <span>Local pickup</span>
+            <span style="display: inline-block; width: 16px; height: 16px; border: 2px solid var(--brand); background: var(--brand); border-radius: 999px;"></span>
+          </div>
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 0; font-size: 14px;">
+            <span>Shipping</span>
+            <span style="display: inline-block; width: 16px; height: 16px; border: 2px solid var(--border); background: var(--bg); border-radius: 999px;"></span>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-brand">Buy now</button>
+          <button class="btn btn-ghost">Make offer</button>
+          <button class="btn btn-link">Message</button>
+        </div>
+      </aside>
+    </div>
+
+    <h2>ActionPanel — Submitting / Error states</h2>
+    <p class="section-desc">Every renderer disables CTAs during <code>submitting</code> and surfaces <code>errorMessage</code> in <code>role="alert"</code> when state is <code>error</code>.</p>
+    <div class="row">
+      <aside class="action-card" data-type="gift">
+        <h3>Free</h3>
+        <p class="meta">Pickup only · Available now</p>
+        <div class="actions">
+          <button class="btn btn-brand" disabled style="opacity: 0.5; cursor: not-allowed;">Sending…</button>
+          <button class="btn btn-ghost" disabled style="opacity: 0.5; cursor: not-allowed;">Message</button>
+        </div>
+      </aside>
+      <aside class="action-card" data-type="rent">
+        <div class="price"><span class="price-amount">$40.00</span><span class="price-unit">/ day</span></div>
+        <div style="margin-top: 16px; padding: 12px; background: var(--bg-subtle); border-radius: 8px; font-size: 13px; color: var(--fg-muted);">[calendar]</div>
+        <div class="actions" style="margin-top: 16px;">
+          <p role="alert" style="margin: 0 0 4px; font-size: 14px; color: var(--danger);">Card declined — try another payment method.</p>
+          <button class="btn btn-brand">Request to book</button>
+          <button class="btn btn-ghost">Message</button>
+        </div>
+      </aside>
+    </div>
+
+    <p style="margin-top: 64px; font-size: 12px; color: var(--fg-subtle); text-align: center;">
+      Created 2026-05-17 · Visual QA for PR 5 — Marketplace UI Primitives · <code>packages/ui</code>
+    </p>
+  </main>
+</body>
+</html>

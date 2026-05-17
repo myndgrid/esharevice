@@ -40,7 +40,18 @@ import { getAuthServer, getClient, getClientAuth } from "./lib/oidc";
  * cookies themselves and don't need middleware refresh).
  */
 
+const AUTHJS_COOKIE = "esharevice_authjs_session";
+
 export async function middleware(req: NextRequest): Promise<NextResponse> {
+  // Auth.js manages its own session cookie + refresh internally; we pass
+  // through any request that has the Auth.js cookie present. This is the
+  // canonical migration-window check — both auth systems coexist by cookie
+  // name. After Authentik is torn down, this whole middleware becomes a
+  // no-op (or gets replaced with the standard Auth.js middleware wrapper).
+  if (req.cookies.get(AUTHJS_COOKIE)?.value) {
+    return NextResponse.next();
+  }
+
   const sessionCookie = req.cookies.get(SESSION_COOKIE)?.value;
   if (!sessionCookie) return NextResponse.next();
 
@@ -122,7 +133,10 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
 export const config = {
   // Run on every page + RSC fetch, but skip Next internals, static assets, and
   // the auth route handlers (they manage cookies themselves and would loop).
+  // /api/authjs/* (Auth.js) is also skipped since Auth.js doesn't need the
+  // refresh dance — it manages its own cookie lifecycle. /.well-known/jwks.json
+  // is public and never touches the session.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|api/auth/login|api/auth/callback|api/auth/logout).*)",
+    "/((?!_next/static|_next/image|favicon.ico|api/auth/login|api/auth/callback|api/auth/logout|api/authjs|\\.well-known/jwks\\.json).*)",
   ],
 };

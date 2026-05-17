@@ -7,10 +7,31 @@ const EnvSchema = z.object({
   WEB_ORIGIN: z.string().default("http://localhost:3000"),
   DATABASE_URL: z.string().min(1),
   REDIS_URL: z.string().min(1).default("redis://localhost:6379"),
-  // OIDC — Authentik is the issuer. The API never signs or stores secrets for tokens.
+  // OIDC — Authentik is the legacy issuer. The API never signs or stores secrets
+  // for tokens. During the Authentik → Auth.js migration window (PR 1b), the API
+  // verifies BOTH issuers via iss-routed JWKS resolution; see auth.ts middleware.
   OIDC_ISSUER: z.string().url(),
   OIDC_AUDIENCE: z.string().min(1),
   OIDC_JWKS_URL: z.string().url(),
+
+  // Auth.js issuer (apps/web). Optional — when absent, the API only accepts
+  // Authentik tokens (legacy-only mode for envs that haven't switched yet).
+  // When set, the API also trusts JWTs whose iss claim matches AUTHJS_ISSUER,
+  // verifying against AUTHJS_JWKS_URL (typically `${web_origin}/.well-known/jwks.json`).
+  AUTHJS_ISSUER: z
+    .string()
+    .url()
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : undefined)),
+  AUTHJS_JWKS_URL: z
+    .string()
+    .url()
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : undefined)),
+  AUTHJS_AUDIENCE: z
+    .string()
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : undefined)),
   // Cloudflare R2 — optional at boot so dev/test can run without uploads wired.
   // If any of {account_id, access_key, secret, bucket} are absent the upload
   // endpoint returns 503; everything else still works.

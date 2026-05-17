@@ -1,8 +1,8 @@
 # Task: e-Sharevice Systems Overhaul — Multi-Type Marketplace with Payments
 
 **Created:** 2026-05-16 22:30 UTC
-**Last Updated:** 2026-05-17 06:10 UTC
-**Status:** In Progress — PRs 1a + 2 + 3 + 4 shipped; PR 1b open; PRs 5–12 ahead
+**Last Updated:** 2026-05-17 06:18 UTC
+**Status:** In Progress — PRs 1a + 2 + 3 + 1b (Phase 1) + 4 shipped; Auth.js cutover + PRs 5–12 ahead
 
 ## Objective
 
@@ -903,7 +903,7 @@ PR-by-PR shipping status. Each PR links to its task log for the implementation d
 | PR | Scope | Status | Task log | GitHub |
 |---|---|---|---|---|
 | **PR 1a** | Visual foundation (sky/amber tokens, button taxonomy, variant + accent-token sweep), migration 0006 `users.password_hash`, Auth.js env scaffolding (docs + RS256 keypair + .env.local sourced) | **Shipped 2026-05-17** | [2026-05-17_pr1a-visual-foundation.md](2026-05-17_pr1a-visual-foundation.md) | [#1](https://github.com/myndgrid/esharevice/pull/1) |
-| **PR 1b** | Auth.js wire-up: install `next-auth@beta`, `apps/web/auth.ts`, JWKS endpoint at `/.well-known/jwks.json`, branded `/login`, replace `apps/web/middleware.ts`, dual-issuer JWKS verifier in API, `/v1/me/provision`, Authentik teardown after 7-day overlap, `lighthouse-auth.cjs` rewrite, `docs/features/2026-05-17_authjs-migration.md` runbook | Pending | — | — |
+| **PR 1b** | Auth.js wire-up Phase 1: `next-auth@beta`, `auth.ts`, JWKS endpoint, branded `/login`, middleware pass-through, dual-issuer API verifier, `/v1/me/provision`, migration runbook. Cutover (Phase 2) + Authentik teardown (Phase 3) follow as separate PRs. `lighthouse-auth.cjs` rewrite deferred to post-cutover. | **Shipped 2026-05-17** | [2026-05-17_pr1b-authjs-wireup.md](2026-05-17_pr1b-authjs-wireup.md) | — |
 | **PR 2** | Schema 0007 listing taxonomy + extended `/v1/exchange-items` API (type-discriminated body, new query params, deprecate `reserve`) | **Shipped 2026-05-17** | [2026-05-17_pr2-listing-taxonomy.md](2026-05-17_pr2-listing-taxonomy.md) | [#2](https://github.com/myndgrid/esharevice/pull/2) |
 | **PR 3** | Schema 0008 bookings (with `EXCLUDE USING gist` no-overlap constraint) + bookings API + pricing helpers + activate/complete cron jobs (no-op until flag flip) | **Shipped 2026-05-17** | [2026-05-17_pr3-bookings.md](2026-05-17_pr3-bookings.md) | — |
 | **PR 4** | Schema 0009 Stripe Connect + `payouts.ts` + webhook receiver + Stripe SDK (CAD default, GST/HST via Stripe Tax) | **Shipped 2026-05-17** | [2026-05-17_pr4-stripe-connect.md](2026-05-17_pr4-stripe-connect.md) | (GitHub PR follow) |

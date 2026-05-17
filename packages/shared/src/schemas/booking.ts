@@ -145,3 +145,16 @@ export type BookingCancel = z.infer<typeof BookingCancel>;
 // `accept` and `return` carry no body — empty object accepted, no fields.
 export const BookingEmptyBody = z.object({}).strict();
 export type BookingEmptyBody = z.infer<typeof BookingEmptyBody>;
+
+// ─────────────────────── Create response
+//
+// POST /v1/items/:id/bookings returns the new booking plus the Stripe
+// PaymentIntent client_secret (null when Stripe isn't configured — the
+// booking still exists, it just has no payment leg). The web app
+// passes the secret straight to Stripe Elements to confirm the charge.
+
+export const BookingCreateResponse = z.object({
+  booking: Booking,
+  client_secret: z.string().nullable(),
+});
+export type BookingCreateResponse = z.infer<typeof BookingCreateResponse>;

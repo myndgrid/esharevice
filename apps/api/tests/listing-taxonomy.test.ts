@@ -404,7 +404,7 @@ describe.runIf(DB_AVAILABLE)("listing taxonomy DB round-trip (integration)", () 
 
   it("blocks paid-type insert without price_cents via CHECK constraint", async () => {
     const db = getDb();
-    await expect(
+    const err = await captureDbError(
       db
         .insert(exchangeItems)
         .values({
@@ -417,12 +417,14 @@ describe.runIf(DB_AVAILABLE)("listing taxonomy DB round-trip (integration)", () 
           // price_cents intentionally omitted
         })
         .returning(),
-    ).rejects.toThrow(/exchange_items_paid_requires_price/i);
+    );
+    expect(err.code).toBe("23514");
+    expect(err.constraint_name).toBe("exchange_items_paid_requires_price");
   });
 
   it("blocks gift-type insert WITH price_cents via CHECK constraint", async () => {
     const db = getDb();
-    await expect(
+    const err = await captureDbError(
       db
         .insert(exchangeItems)
         .values({
@@ -435,12 +437,14 @@ describe.runIf(DB_AVAILABLE)("listing taxonomy DB round-trip (integration)", () 
           price_cents: 100,
         })
         .returning(),
-    ).rejects.toThrow(/exchange_items_paid_requires_price/i);
+    );
+    expect(err.code).toBe("23514");
+    expect(err.constraint_name).toBe("exchange_items_paid_requires_price");
   });
 
   it("rejects negative price_cents via CHECK constraint", async () => {
     const db = getDb();
-    await expect(
+    const err = await captureDbError(
       db
         .insert(exchangeItems)
         .values({
@@ -454,7 +458,9 @@ describe.runIf(DB_AVAILABLE)("listing taxonomy DB round-trip (integration)", () 
           condition: "good",
         })
         .returning(),
-    ).rejects.toThrow(/exchange_items_price_cents_nonneg/i);
+    );
+    expect(err.code).toBe("23514");
+    expect(err.constraint_name).toBe("exchange_items_price_cents_nonneg");
   });
 });
 
@@ -467,5 +473,25 @@ async function probeDb(): Promise<boolean> {
     return true;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Drizzle wraps postgres-js errors; constraint name + SQL state code live on
+ * `cause`. Same helper as bookings.test.ts — see that file for the rationale.
+ */
+type PgErrorShape = { constraint_name?: string; code?: string; message: string };
+
+async function captureDbError(promise: Promise<unknown>): Promise<PgErrorShape> {
+  try {
+    await promise;
+    throw new Error("expected the query to throw, but it resolved");
+  } catch (e) {
+    const err = e as { cause?: { constraint_name?: string; code?: string; message?: string }; message?: string };
+    return {
+      constraint_name: err.cause?.constraint_name,
+      code: err.cause?.code,
+      message: err.cause?.message ?? err.message ?? "",
+    };
   }
 }

@@ -86,7 +86,7 @@ export default async function ItemDetailPage({ params, searchParams }: Props): P
           <p className="mb-4 whitespace-pre-line text-sm text-fg">{item.description}</p>
 
           <dl className="mb-6 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-            <Pair label="Exchange for" value={item.exchange} />
+            {item.exchange && <Pair label="Exchange for" value={item.exchange} />}
             <Pair label="Date" value={formatDate(item.date)} />
             {item.rate_type && <Pair label="Rate / quantity" value={item.rate_type} />}
             <Pair label="Listed" value={new Date(item.created_at).toLocaleDateString()} />

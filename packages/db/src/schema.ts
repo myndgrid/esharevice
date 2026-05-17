@@ -3,6 +3,9 @@ import {
   boolean,
   customType,
   index,
+  integer,
+  numeric,
+  pgEnum,
   pgTable,
   primaryKey,
   text,
@@ -27,6 +30,40 @@ const tsvector = customType<{ data: string; driverData: string }>({
     return "tsvector";
   },
 });
+
+// ─────────────────────── Listing taxonomy enums (migration 0007)
+
+export const listingTypeEnum = pgEnum("listing_type", [
+  "gift",
+  "trade",
+  "rent",
+  "hire",
+  "sell",
+]);
+export type ListingType = (typeof listingTypeEnum.enumValues)[number];
+
+export const priceUnitEnum = pgEnum("price_unit", ["hour", "day", "fixed"]);
+export type PriceUnit = (typeof priceUnitEnum.enumValues)[number];
+
+export const itemConditionEnum = pgEnum("item_condition", [
+  "new",
+  "like_new",
+  "good",
+  "fair",
+  "well_used",
+]);
+export type ItemCondition = (typeof itemConditionEnum.enumValues)[number];
+
+export const locationPrecisionEnum = pgEnum("location_precision", [
+  "exact",
+  "street",
+  "neighbourhood",
+  "postal_code",
+  "city",
+]);
+export type LocationPrecision = (typeof locationPrecisionEnum.enumValues)[number];
+
+// ─────────────────────── Tables
 
 export const users = pgTable(
   "users",
@@ -64,6 +101,33 @@ export const users = pgTable(
   ],
 );
 
+/**
+ * categories — the 40-row seed defines the leaf taxonomy users tag listings
+ * with. `parent_slug` groups them into the 10 top-level filters shown on the
+ * landing category strip (Tools / Skills / Kitchen / Wheels / Garden / Studio
+ * / Lessons / Services / Edibles / Sports / Kids / Apparel / Free).
+ *
+ * Read-cache friendly: rows rarely change post-seed (24h cache in the API).
+ * `display_order` is the stable sort key.
+ */
+export const categories = pgTable(
+  "categories",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    slug: text("slug").notNull(),
+    name: text("name").notNull(),
+    parent_slug: text("parent_slug"),
+    icon: text("icon"),
+    display_order: integer("display_order").notNull().default(0),
+    created_at: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("categories_slug_uq").on(t.slug),
+    index("categories_parent_slug_idx").on(t.parent_slug),
+    index("categories_display_order_idx").on(t.display_order),
+  ],
+);
+
 export const exchangeItems = pgTable(
   "exchange_items",
   {
@@ -74,7 +138,10 @@ export const exchangeItems = pgTable(
     provider: text("provider").notNull(),
     service: text("service").notNull(),
     date: text("date").notNull(),
-    exchange: text("exchange").notNull(),
+    // Nullable since migration 0007 — non-trade listings (gift/rent/hire/sell)
+    // don't supply a "wants in return" line. Stays non-null for trade rows,
+    // enforced by the API's Zod superRefine, not by SQL.
+    exchange: text("exchange"),
     description: text("description").notNull(),
     rate_type: text("rate_type"),
     img_key: text("img_key"), // R2 object key; URL is composed at read time
@@ -88,13 +155,36 @@ export const exchangeItems = pgTable(
     archived_at: timestamp("archived_at", { withTimezone: true }),
     // Generated tsvector for FTS — finalized in a manual migration so weights stick.
     search: tsvector("search"),
+    // ─── Listing taxonomy (0007) ───
+    // Default 'trade' in SQL so every existing row stays a trade listing
+    // without a backfill. Immutable post-create at the API layer.
+    listing_type: listingTypeEnum("listing_type").notNull().default("trade"),
+    // Paid types (rent/hire/sell) carry price in cents-CAD. SQL CHECK enforces
+    // "paid type ⇔ price_cents non-null" so a misconfigured client can't ship
+    // a free rent listing or a priced gift.
+    price_cents: integer("price_cents"),
+    price_unit: priceUnitEnum("price_unit"),
+    deposit_cents: integer("deposit_cents"),
+    condition: itemConditionEnum("condition"),
+    available_from: timestamp("available_from", { withTimezone: true }),
+    available_to: timestamp("available_to", { withTimezone: true }),
+    location_lat: numeric("location_lat", { precision: 9, scale: 6 }),
+    location_lng: numeric("location_lng", { precision: 9, scale: 6 }),
+    location_precision: locationPrecisionEnum("location_precision"),
+    category_id: uuid("category_id").references(() => categories.id, {
+      onDelete: "set null",
+    }),
+    // ─── Timestamps ───
     created_at: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updated_at: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     index("exchange_items_user_id_idx").on(t.user_id),
     index("exchange_items_reserved_idx").on(t.reserved),
-    // GIN index added in a manual migration (drizzle-kit can't express USING gin on a generated tsvector yet).
+    // GIN index on `search` added in a manual migration.
+    // listing_type / category / price / location indexes live in migration
+    // 0007 SQL with `WHERE archived_at IS NULL` predicates that drizzle-kit
+    // can't currently express.
   ],
 );
 
@@ -191,6 +281,8 @@ export const messages = pgTable(
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
+export type Category = typeof categories.$inferSelect;
+export type NewCategory = typeof categories.$inferInsert;
 export type ExchangeItemRow = typeof exchangeItems.$inferSelect;
 export type NewExchangeItemRow = typeof exchangeItems.$inferInsert;
 export type ExchangeItemSaveRow = typeof exchangeItemSaves.$inferSelect;

@@ -49,7 +49,7 @@ export function EditItemForm({ item }: { item: ExchangeItem }): React.ReactEleme
         <input
           name="exchange"
           maxLength={240}
-          defaultValue={item.exchange}
+          defaultValue={item.exchange ?? ""}
           className={inputCls}
           required
         />

@@ -1,4 +1,5 @@
 export * from "./schemas/user";
+export * from "./schemas/category";
 export * from "./schemas/exchange-item";
 export * from "./schemas/pagination";
 export * from "./schemas/problem";

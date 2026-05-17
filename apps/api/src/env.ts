@@ -63,6 +63,22 @@ const EnvSchema = z.object({
     .optional()
     .transform((v) => (v && v.length > 0 ? v : undefined))
     .pipe(z.string().url().optional()),
+
+  // ─── Feature flags ───
+  // Per the marketplace overhaul plan (tasks/2026-05-16_premium-marketplace-
+  // redesign-plan.md §Execution Order), each new schema lives in prod from
+  // day one but the endpoints that consume new fields gate on a flag. The
+  // listing-taxonomy migration (0007) ships its schema + additive response
+  // fields immediately; the dedicated /v1/categories endpoint 404s until
+  // this flag flips on. Default off so an unset env defaults to safe legacy
+  // behavior. Set "true" / "1" / "yes" / "on" to enable.
+  FEATURE_LISTING_TYPES: z
+    .string()
+    .optional()
+    .transform((v): boolean => {
+      const norm = (v ?? "").trim().toLowerCase();
+      return norm === "1" || norm === "true" || norm === "yes" || norm === "on";
+    }),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

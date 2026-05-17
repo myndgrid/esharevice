@@ -27,6 +27,11 @@ COPY --from=deps /repo/packages/shared/node_modules ./packages/shared/node_modul
 COPY --from=deps /repo/packages/ui/node_modules ./packages/ui/node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
+# Placeholder values so `next build`'s page-data collection can import
+# auth.ts without tripping its module-load `throw` for AUTH_SECRET. These
+# are confined to the build stage — the runtime stage starts from a clean
+# base image and reads the real values from the container's environment.
+ENV AUTH_SECRET=build-placeholder-not-used-at-runtime
 RUN pnpm --filter @esharevice/web build
 
 # ── 4. Runtime — only the standalone artifact ──────────────

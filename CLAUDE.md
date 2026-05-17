@@ -1030,6 +1030,30 @@ Same shape applies to any identity-provider rotation (Auth0 → Clerk, Cognito �
 
 ---
 
+### [Build] Squash-Merge Drops Working-Tree Edits That Were Never `git add`-ed
+**Description:** A PR is opened from a session that left a bunch of edits on disk without staging them. The branch has commits A → B → C; the working tree has A → B → C **plus** ad-hoc edits to other files made during the same session. GitHub's "Squash and merge" replays only the *commits*, so the unstaged edits never reach `main`. Locally everything still looks correct (the operator's working tree is unchanged, the diff against `main` looks complete) but on the deploy target `git pull` brings down only the squashed commits — half the cleanup is missing. This bit us with PR #9 (Phase 3 of the Authentik teardown): `lib/oidc.ts` + `lib/session.ts` + `infra/authentik/` were committed, but the matching edits to `infra/docker-compose.yml`, `infra/Caddyfile`, `apps/web/middleware.ts`, and 13 other files were applied on disk and never staged. The VPS pulled a half-Phase-3 stack that referenced Authentik services whose env vars had already been deleted.
+**Avoid:** Before opening a PR, run `git status` and visually confirm there are NO unstaged-modified files. Especially after a long agent-driven session where many edits land in parallel. A `git status` that shows `Changes not staged for commit:` is a load-bearing signal — those changes will NOT reach the merge. Pre-PR ritual: `git status` clean + `git diff <base>...HEAD --stat | wc -l` matches the GitHub PR diff line count. When they don't match, the gap is your problem.
+
+---
+
+### [Build] `next build` Tripping On Module-Load Env Throws During Page-Data Collection
+**Description:** Next 15's production build runs a "collect page data" pass that imports every page module statically to read its metadata (route, dynamic config, headers, etc.). If any of those imports transitively reaches a module whose top-level code throws — e.g. `apps/web/auth.ts` doing `if (!AUTH_SECRET) throw new Error("AUTH_SECRET is required")` — the build aborts with the cryptic error `Failed to collect page data for /_not-found`. There's no indication that an env-var guard caused it; the error names the not-found route because that's the first generated page Next analyses. Even more confusing: the route handler `/api/authjs/[...nextauth]` is the actual culprit but doesn't appear in the error.
+**Avoid:** Two options. **(A)** Provide a build-time placeholder via the Dockerfile's builder stage — `ENV AUTH_SECRET=build-placeholder-not-used-at-runtime` — confined to the build stage so it never ships in the runtime image (different `FROM`). Same trick works for any other env var the module-load asserts on. **(B)** Lazy-load the env check — move the assertion inside the handler function that actually uses the secret, instead of at module top-level. Option A is the lighter touch when you don't control the module's source (e.g. it's in a workspace dep). Option B is correct when you do.
+
+---
+
+### [Build] Compose `environment:` Block Forgetting Feature Flags Silently 404s New Endpoints
+**Description:** API route handlers that gate on Zod-validated env feature flags (e.g. `if (!env.FEATURE_LISTING_TYPES) throw new HTTPException(404)`) fail in prod when the corresponding compose `environment:` line is missing. The Zod env validator defaults the flag to `false`, the OpenAPI spec still LISTS the path (because schema generation runs regardless of the flag), and the smoke test gets a 404 that *looks* like a routing problem. Root cause is a one-line env oversight in `docker-compose.yml`.
+**Avoid:** Whenever a new feature flag is added to `apps/<svc>/src/env.ts`, in the SAME COMMIT update the corresponding compose `environment:` block to pass it through (`FEATURE_X: ${FEATURE_X:-false}`) AND add a line to `infra/.env.example`. Treat env-var introduction as a 3-file change minimum: `env.ts` + `docker-compose.yml` + `.env.example`. CI lint could enforce this via grep — for any `env.FEATURE_*` reference, fail if the same string isn't in `infra/docker-compose.yml`.
+
+---
+
+### [Build] Auth.js v5 Needs `AUTH_URL` Even With `trustHost: true`
+**Description:** `trustHost: true` in the NextAuth config tells Auth.js to *trust* the request's host header for cookie domains, CSRF origin checks, and session cookie scoping. It does NOT cover *outgoing link construction* — when Auth.js builds `signinUrl` and `callbackUrl` (returned by `/api/authjs/providers` and embedded into the OAuth handshake), it consults `AUTH_URL` first and falls back to the listening socket if unset. In a containerised app that binds to `0.0.0.0:3000`, the unset case produces `https://0.0.0.0:3000/api/authjs/callback/google` — a literal `0.0.0.0` URL the browser hits with `ERR_SSL_PROTOCOL_ERROR`, and Google rejects with a `redirect_uri_mismatch`. The user lands on `/login?error=Configuration` with no useful breadcrumb.
+**Avoid:** ALWAYS set `AUTH_URL=https://<canonical-public-origin>` explicitly on any Auth.js v5 deployment behind a reverse proxy. `trustHost` and the JWT-issuer config (`AUTH_ISSUER`) are insufficient on their own. Local dev usually gets away with it because Next's dev server binds to `localhost:3000` which happens to be a valid HTTP URL — prod breaks the moment you containerise + reverse-proxy. Pair this with adding the canonical callback URL to the upstream IdP's authorized redirect list as part of the same deploy step.
+
+---
+
 ## Debugging Protocol
 
 > Before touching any code — **reproduce first, locate second, fix last.**
@@ -1326,4 +1350,4 @@ node -e "const wtf = require('wtfnode'); setTimeout(wtf.dump, 5000);"
 
 ---
 
-*Last updated: 2026-05-16 22:05 UTC | Global SWE Agent Config | Adapt the Architecture and Project Structure sections per project — everything else applies universally. Bug registry: 49 entries (+1 from /cso security audit — `startsWith("/")` is not a sufficient open-redirect guard; protocol-relative URLs `//evil.com/path` escape via the URL constructor's base-resolution semantics. Always resolve + compare `candidate.origin === baseOrigin`).*
+*Last updated: 2026-05-17 14:05 UTC | Global SWE Agent Config | Adapt the Architecture and Project Structure sections per project — everything else applies universally. Bug registry: 53 entries (+4 from the 2026-05-17 production catch-up deploy — squash-merge drops unstaged edits; `next build` page-data collection trips on module-load env throws; compose `environment:` block omitting FEATURE flags silently 404s new endpoints; Auth.js v5 needs `AUTH_URL` even with `trustHost: true`).*

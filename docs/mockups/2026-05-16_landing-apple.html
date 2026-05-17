@@ -1,0 +1,1661 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>esharevice — the neighbourhood, exchanged.</title>
+  <meta name="description" content="A service-exchange ledger for neighbours who'd rather barter than buy. List what you have. Borrow what's two streets over. Settle the trade however you like." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ============================================================
+       Apple-team aesthetic
+       — neutral, crisp, generous whitespace
+       — type does the work, ornament is removed
+       — motion is subtle springs, never marquees
+       ============================================================ */
+
+    :root {
+      /* surfaces */
+      --bg:            #ffffff;
+      --bg-soft:       #fbfbfd;
+      --bg-elev:       #f5f5f7;
+      --bg-dark:       #000000;
+      --bg-dark-soft:  #1d1d1f;
+
+      /* ink */
+      --ink:           #1d1d1f;
+      --ink-2:         #424245;
+      --ink-3:         #6e6e73;
+      --ink-4:         #86868b;
+      --ink-on-dark:   #f5f5f7;
+      --ink-on-dark-2: #a1a1a6;
+
+      /* lines */
+      --hairline:      rgba(0, 0, 0, 0.08);
+      --hairline-2:    rgba(0, 0, 0, 0.14);
+      --hairline-dark: rgba(255, 255, 255, 0.10);
+
+      /* accent — one signal blue, used sparingly */
+      --accent:        #0071e3;
+      --accent-hover:  #0077ed;
+      --accent-press:  #006edb;
+
+      /* shadow — pure depth, no warmth */
+      --shadow-1:      0 1px 2px rgba(0,0,0,0.04), 0 4px 12px -2px rgba(0,0,0,0.04);
+      --shadow-2:      0 1px 2px rgba(0,0,0,0.04), 0 24px 48px -16px rgba(0,0,0,0.10);
+      --shadow-3:      0 2px 4px rgba(0,0,0,0.04), 0 40px 80px -24px rgba(0,0,0,0.14);
+
+      /* type */
+      --sans: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
+      --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+      /* radius */
+      --r-sm:   8px;
+      --r-md:   14px;
+      --r-lg:   18px;
+      --r-xl:   22px;
+      --r-2xl:  28px;
+      --r-3xl:  36px;
+      --r-pill: 980px;
+
+      /* timing */
+      --ease:   cubic-bezier(0.16, 1, 0.3, 1);
+      --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+      /* container */
+      --maxw:   980px;
+      --maxw-wide: 1180px;
+    }
+
+    /* ---------- reset ---------- */
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    html {
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+      font-feature-settings: "ss01", "cv11";
+      scroll-behavior: smooth;
+    }
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--sans);
+      font-size: 17px;
+      line-height: 1.47;
+      letter-spacing: -0.005em;
+      overflow-x: hidden;
+    }
+    img, svg { display: block; max-width: 100%; }
+    a { color: inherit; text-decoration: none; }
+    button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
+    input, textarea, select { font: inherit; color: inherit; }
+    ::selection { background: rgba(0,113,227,0.18); }
+
+    /* ---------- type system ---------- */
+    .eyebrow {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--accent);
+      letter-spacing: -0.005em;
+      margin-bottom: 14px;
+    }
+    .eyebrow-mono {
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+    }
+
+    h1, h2, h3, h4 {
+      font-weight: 600;
+      letter-spacing: -0.025em;
+      line-height: 1.05;
+      margin: 0;
+    }
+
+    .display-xl {
+      font-size: clamp(48px, 7.2vw, 96px);
+      font-weight: 600;
+      letter-spacing: -0.045em;
+      line-height: 1.02;
+    }
+    .display-lg {
+      font-size: clamp(40px, 5.4vw, 72px);
+      font-weight: 600;
+      letter-spacing: -0.038em;
+      line-height: 1.05;
+    }
+    .display-md {
+      font-size: clamp(32px, 3.8vw, 48px);
+      font-weight: 600;
+      letter-spacing: -0.03em;
+      line-height: 1.08;
+    }
+    .display-sm {
+      font-size: clamp(24px, 2.4vw, 32px);
+      font-weight: 600;
+      letter-spacing: -0.022em;
+      line-height: 1.15;
+    }
+
+    .lede {
+      font-size: clamp(19px, 1.5vw, 22px);
+      line-height: 1.4;
+      letter-spacing: -0.012em;
+      color: var(--ink-2);
+      font-weight: 400;
+    }
+
+    .mono { font-family: var(--mono); font-feature-settings: "tnum" 1; }
+
+    /* ---------- shell ---------- */
+    .wrap {
+      width: 100%;
+      max-width: var(--maxw);
+      margin: 0 auto;
+      padding: 0 22px;
+    }
+    .wrap--wide { max-width: var(--maxw-wide); }
+    @media (max-width: 720px) { .wrap { padding: 0 20px; } }
+
+    /* ---------- nav ---------- */
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 60;
+      background: color-mix(in oklab, var(--bg) 72%, transparent);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      backdrop-filter: saturate(180%) blur(20px);
+      border-bottom: 1px solid var(--hairline);
+    }
+    .nav-inner {
+      max-width: var(--maxw-wide);
+      margin: 0 auto;
+      padding: 0 22px;
+      height: 48px;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 22px;
+    }
+    .nav-brand {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .nav-brand .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      display: inline-block;
+    }
+    .nav-links {
+      display: flex;
+      gap: 28px;
+      justify-content: center;
+    }
+    .nav-link {
+      font-size: 13px;
+      color: var(--ink-2);
+      transition: color .2s var(--ease);
+    }
+    .nav-link:hover { color: var(--ink); }
+    .nav-cta {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .nav-cta .sign-in { font-size: 13px; color: var(--ink-2); }
+    .nav-cta .sign-in:hover { color: var(--ink); }
+    @media (max-width: 720px) {
+      .nav-links { display: none; }
+    }
+
+    /* ---------- buttons ---------- */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 22px;
+      border-radius: var(--r-pill);
+      font-size: 15px;
+      font-weight: 500;
+      letter-spacing: -0.01em;
+      transition: background .2s var(--ease), transform .25s var(--ease), color .2s var(--ease);
+      white-space: nowrap;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+    }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-primary:active { background: var(--accent-press); transform: scale(0.985); }
+    .btn-ghost {
+      color: var(--accent);
+    }
+    .btn-ghost:hover { color: var(--accent-hover); }
+    .btn-ghost .arr { transition: transform .3s var(--ease); }
+    .btn-ghost:hover .arr { transform: translateX(3px); }
+
+    .btn-dark {
+      background: var(--ink);
+      color: #fff;
+    }
+    .btn-dark:hover { background: var(--bg-dark-soft); }
+    .btn-dark:active { transform: scale(0.985); }
+
+    .btn-light {
+      background: #fff;
+      color: var(--ink);
+      box-shadow: 0 0 0 1px var(--hairline) inset;
+    }
+    .btn-light:hover { background: var(--bg-elev); }
+
+    /* ---------- hero ---------- */
+    .hero {
+      padding: 96px 0 0;
+      text-align: center;
+    }
+    @media (max-width: 720px) { .hero { padding: 64px 0 0; } }
+
+    .hero h1 {
+      max-width: 14ch;
+      margin: 12px auto 22px;
+    }
+    .hero .lede {
+      max-width: 38ch;
+      margin: 0 auto;
+    }
+    .hero-cta {
+      display: flex;
+      gap: 22px;
+      justify-content: center;
+      align-items: center;
+      margin: 38px 0 0;
+      flex-wrap: wrap;
+    }
+
+    /* ---------- hero canvas (product card showcase) ---------- */
+    .hero-canvas {
+      margin: 80px auto 0;
+      max-width: var(--maxw-wide);
+      padding: 0 22px;
+    }
+    .hero-stage {
+      position: relative;
+      background: var(--bg-elev);
+      border-radius: var(--r-3xl);
+      padding: clamp(28px, 5vw, 64px);
+      overflow: hidden;
+      isolation: isolate;
+    }
+    .hero-stage::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(120% 80% at 50% 0%, rgba(0,113,227,0.06), transparent 60%);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .hero-stage-grid {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: 1fr 1.05fr;
+      gap: 48px;
+      align-items: center;
+    }
+    @media (max-width: 880px) {
+      .hero-stage-grid { grid-template-columns: 1fr; gap: 32px; }
+    }
+    .hero-stage-text .stage-eyebrow {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--accent);
+      margin-bottom: 14px;
+    }
+    .hero-stage-text h2 {
+      font-size: clamp(30px, 3.6vw, 44px);
+      letter-spacing: -0.03em;
+      line-height: 1.08;
+      margin: 0 0 18px;
+      max-width: 16ch;
+    }
+    .hero-stage-text p {
+      font-size: 17px;
+      color: var(--ink-2);
+      line-height: 1.5;
+      margin: 0 0 22px;
+      max-width: 42ch;
+    }
+    .stage-stat-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 22px;
+      margin-top: 28px;
+      padding-top: 22px;
+      border-top: 1px solid var(--hairline);
+    }
+    .stage-stat .k {
+      font-size: 12px;
+      color: var(--ink-3);
+      margin-bottom: 4px;
+      letter-spacing: -0.005em;
+    }
+    .stage-stat .v {
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    /* product card (right side of hero stage) */
+    .product-card {
+      position: relative;
+      background: #fff;
+      border-radius: var(--r-2xl);
+      box-shadow: var(--shadow-2);
+      overflow: hidden;
+      transform: translateZ(0);
+      transition: transform .8s var(--ease), box-shadow .8s var(--ease);
+    }
+    .product-card:hover {
+      transform: translateY(-4px) translateZ(0);
+      box-shadow: var(--shadow-3);
+    }
+    .product-card .photo {
+      aspect-ratio: 5/4;
+      background: var(--bg-elev);
+      position: relative;
+      overflow: hidden;
+    }
+    .product-card .photo img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scale(1.02);
+      transition: transform 1.6s var(--ease);
+    }
+    .product-card:hover .photo img { transform: scale(1.05); }
+    .product-card .live-tag {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      background: rgba(255,255,255,0.92);
+      -webkit-backdrop-filter: blur(20px);
+      backdrop-filter: blur(20px);
+      border-radius: var(--r-pill);
+      padding: 6px 12px 6px 10px;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: -0.005em;
+      color: var(--ink-2);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .product-card .live-tag .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #34c759;
+      box-shadow: 0 0 0 0 rgba(52, 199, 89, 0.55);
+      animation: pulse 2.4s ease-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(52,199,89,0.55); }
+      70% { box-shadow: 0 0 0 8px rgba(52,199,89,0); }
+    }
+    .product-card .body { padding: 22px 22px 20px; }
+    .product-card .who {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .product-card .who .avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #007aff, #5856d6);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      font-size: 12px;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+    .product-card .who .meta { display: flex; flex-direction: column; line-height: 1.2; }
+    .product-card .who .meta b { font-weight: 600; color: var(--ink); font-size: 14px; }
+    .product-card .who .meta span { color: var(--ink-3); font-size: 12px; margin-top: 2px; }
+    .product-card .title {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.018em;
+      line-height: 1.25;
+      margin: 0 0 14px;
+    }
+    .product-card .swap-grid {
+      display: grid;
+      gap: 10px;
+      padding-top: 14px;
+      border-top: 1px solid var(--hairline);
+    }
+    .product-card .swap-row {
+      display: grid;
+      grid-template-columns: 64px 1fr;
+      gap: 14px;
+      align-items: baseline;
+    }
+    .swap-row .lbl {
+      font-size: 11px;
+      color: var(--ink-3);
+      letter-spacing: 0;
+    }
+    .swap-row .val { font-size: 14px; color: var(--ink-2); line-height: 1.4; }
+    .swap-row .val.want { color: var(--accent); font-weight: 500; }
+    .product-card .actions {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      margin-top: 18px;
+    }
+    .product-card .open {
+      background: var(--ink);
+      color: #fff;
+      padding: 11px 16px;
+      border-radius: var(--r-md);
+      font-size: 13px;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background .2s var(--ease), transform .25s var(--ease);
+    }
+    .product-card .open:hover { background: var(--bg-dark-soft); }
+    .product-card .open:active { transform: scale(0.97); }
+    .product-card .save {
+      width: 42px;
+      height: 42px;
+      border-radius: var(--r-md);
+      border: 1px solid var(--hairline);
+      display: grid;
+      place-items: center;
+      color: var(--ink-2);
+      transition: background .2s var(--ease), color .2s var(--ease);
+    }
+    .product-card .save:hover { background: var(--bg-elev); color: var(--accent); }
+
+    /* ---------- section base ---------- */
+    .section {
+      padding: 140px 0;
+    }
+    @media (max-width: 720px) { .section { padding: 80px 0; } }
+    .section-head {
+      text-align: center;
+      max-width: 720px;
+      margin: 0 auto 64px;
+    }
+    .section-head h2 {
+      margin: 0 auto 18px;
+      max-width: 18ch;
+    }
+    .section-head p {
+      margin: 0 auto;
+      max-width: 44ch;
+      color: var(--ink-2);
+    }
+
+    /* ---------- highlight tiles (replaces bento) ---------- */
+    .highlights {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      grid-auto-rows: minmax(0, auto);
+      gap: 18px;
+      max-width: var(--maxw-wide);
+      margin: 0 auto;
+      padding: 0 22px;
+    }
+    @media (max-width: 900px) { .highlights { grid-template-columns: repeat(6, 1fr); } }
+    @media (max-width: 640px) { .highlights { grid-template-columns: 1fr; gap: 14px; } }
+
+    .tile {
+      position: relative;
+      background: var(--bg-elev);
+      border-radius: var(--r-3xl);
+      overflow: hidden;
+      transition: transform .6s var(--ease), box-shadow .6s var(--ease);
+      isolation: isolate;
+    }
+    .tile:hover { transform: translateY(-3px); box-shadow: var(--shadow-2); }
+
+    .tile.dark { background: var(--ink); color: var(--ink-on-dark); }
+    .tile.dark .tile-meta b { color: #fff; }
+    .tile.dark .tile-meta { color: var(--ink-on-dark-2); }
+    .tile.dark .tile-swap { color: var(--ink-on-dark-2); border-top-color: var(--hairline-dark); }
+    .tile.dark .tile-swap em { color: #7aaaff; }
+
+    .tile-photo {
+      aspect-ratio: 16/10;
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(135deg, #e5e5ea, #d1d1d6);
+    }
+    .tile-photo img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 1.4s var(--ease);
+    }
+    .tile:hover .tile-photo img { transform: scale(1.04); }
+    .tile-corner {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      background: rgba(255,255,255,0.92);
+      -webkit-backdrop-filter: blur(12px);
+      backdrop-filter: blur(12px);
+      padding: 5px 12px;
+      border-radius: var(--r-pill);
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--ink-2);
+      letter-spacing: -0.005em;
+    }
+    .tile-body {
+      padding: 24px 26px 26px;
+    }
+    .tile-ttl {
+      font-size: 19px;
+      font-weight: 600;
+      letter-spacing: -0.018em;
+      line-height: 1.25;
+      margin: 0 0 10px;
+    }
+    .tile-meta {
+      font-size: 13px;
+      color: var(--ink-3);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .tile-meta b { font-weight: 500; color: var(--ink-2); }
+    .tile-meta .sep { width: 3px; height: 3px; border-radius: 50%; background: currentColor; opacity: 0.4; }
+    .tile-swap {
+      padding-top: 14px;
+      border-top: 1px solid var(--hairline);
+      font-size: 13.5px;
+      color: var(--ink-2);
+      display: grid;
+      grid-template-columns: 14px 1fr;
+      gap: 10px;
+      align-items: center;
+    }
+    .tile-swap em {
+      color: var(--accent);
+      font-style: normal;
+      font-weight: 500;
+    }
+    .tile-swap svg { color: var(--accent); }
+
+    /* feature variant — overlay text on photo */
+    .tile.feature .tile-photo { aspect-ratio: 12/8; }
+    .tile.feature .tile-photo::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, transparent 35%, rgba(0,0,0,0.55) 100%);
+    }
+    .tile.feature .tile-body {
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      color: #fff;
+      padding: 30px 32px 30px;
+    }
+    .tile.feature .tile-ttl { color: #fff; font-size: 24px; max-width: 24ch; }
+    .tile.feature .tile-meta { color: rgba(255,255,255,0.7); }
+    .tile.feature .tile-meta b { color: #fff; }
+    .tile.feature .tile-swap { color: rgba(255,255,255,0.8); border-top-color: rgba(255,255,255,0.18); }
+    .tile.feature .tile-swap em { color: #7aaaff; }
+
+    /* grid spans */
+    .t1 { grid-column: span 7; }
+    .t2 { grid-column: span 5; }
+    .t3 { grid-column: span 5; }
+    .t4 { grid-column: span 7; }
+    .t5 { grid-column: span 4; }
+    .t6 { grid-column: span 4; }
+    .t7 { grid-column: span 4; }
+    @media (max-width: 900px) {
+      .t1, .t2, .t3, .t4 { grid-column: span 6; }
+      .t5, .t6, .t7 { grid-column: span 2; }
+    }
+    @media (max-width: 640px) {
+      .t1, .t2, .t3, .t4, .t5, .t6, .t7 { grid-column: 1 / -1; }
+    }
+
+    /* segmented control / filters */
+    .segmented {
+      display: inline-flex;
+      gap: 4px;
+      padding: 4px;
+      background: var(--bg-elev);
+      border-radius: var(--r-pill);
+      margin: 32px auto 56px;
+    }
+    .seg {
+      padding: 8px 16px;
+      border-radius: var(--r-pill);
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--ink-2);
+      transition: background .2s var(--ease), color .2s var(--ease);
+    }
+    .seg:hover { color: var(--ink); }
+    .seg.active {
+      background: #fff;
+      color: var(--ink);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+    }
+    .segmented-wrap { text-align: center; }
+
+    /* ---------- how it works ---------- */
+    .how-section {
+      background: var(--bg-elev);
+      padding: 140px 0;
+    }
+    @media (max-width: 720px) { .how-section { padding: 80px 0; } }
+    .how-grid {
+      display: grid;
+      gap: 18px;
+      grid-template-columns: repeat(3, 1fr);
+      max-width: var(--maxw-wide);
+      margin: 0 auto;
+      padding: 0 22px;
+    }
+    @media (max-width: 900px) { .how-grid { grid-template-columns: 1fr; gap: 14px; } }
+
+    .step-card {
+      background: #fff;
+      border-radius: var(--r-3xl);
+      padding: 32px 32px 28px;
+      display: flex;
+      flex-direction: column;
+      min-height: 460px;
+      position: relative;
+      overflow: hidden;
+      transition: transform .6s var(--ease), box-shadow .6s var(--ease);
+    }
+    .step-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-2); }
+    .step-num {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 14px;
+      letter-spacing: -0.005em;
+    }
+    .step-card h3 {
+      font-size: 24px;
+      font-weight: 600;
+      letter-spacing: -0.022em;
+      line-height: 1.15;
+      margin: 0 0 14px;
+    }
+    .step-card p {
+      font-size: 15px;
+      line-height: 1.5;
+      color: var(--ink-2);
+      margin: 0;
+    }
+    .step-visual {
+      margin-top: 28px;
+      flex: 1;
+      display: flex;
+      align-items: flex-end;
+    }
+
+    /* visual 1 — search */
+    .v-search {
+      width: 100%;
+      background: var(--bg-elev);
+      border-radius: var(--r-lg);
+      padding: 14px;
+      box-shadow: var(--shadow-1);
+    }
+    .v-search-bar {
+      display: grid;
+      grid-template-columns: 16px 1fr auto;
+      gap: 12px;
+      align-items: center;
+      padding: 10px 12px;
+      background: #fff;
+      border-radius: var(--r-sm);
+      margin-bottom: 10px;
+    }
+    .v-search-bar input {
+      border: 0;
+      background: transparent;
+      font-size: 14px;
+      width: 100%;
+    }
+    .v-search-bar input:focus { outline: none; }
+    .v-search-bar .kbd {
+      font-family: var(--mono);
+      font-size: 10px;
+      padding: 2px 6px;
+      border: 1px solid var(--hairline-2);
+      border-radius: 4px;
+      color: var(--ink-3);
+    }
+    .v-search-row {
+      display: grid;
+      grid-template-columns: 24px 1fr auto;
+      gap: 10px;
+      align-items: center;
+      padding: 8px 12px;
+      font-size: 12.5px;
+      border-radius: var(--r-sm);
+      transition: background .2s var(--ease);
+    }
+    .v-search-row + .v-search-row { margin-top: 2px; }
+    .v-search-row:hover { background: rgba(0,0,0,0.03); }
+    .v-search-row .ic {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      background: #fff;
+      display: grid;
+      place-items: center;
+      color: var(--ink-2);
+    }
+    .v-search-row .t b { font-weight: 500; color: var(--ink); }
+    .v-search-row .t span { display: block; color: var(--ink-3); font-size: 11px; margin-top: 1px; }
+    .v-search-row .dist { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+
+    /* visual 2 — propose */
+    .v-propose {
+      width: 100%;
+      background: var(--bg-elev);
+      border-radius: var(--r-lg);
+      padding: 14px;
+      display: grid;
+      gap: 10px;
+    }
+    .v-propose .row {
+      display: grid;
+      grid-template-columns: 1fr 22px 1fr;
+      gap: 8px;
+      align-items: stretch;
+    }
+    .v-cell {
+      background: #fff;
+      border-radius: var(--r-sm);
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .v-cell .lbl { font-size: 10px; color: var(--ink-3); letter-spacing: 0; }
+    .v-cell .ttl { font-size: 13px; font-weight: 500; line-height: 1.25; letter-spacing: -0.005em; }
+    .v-cell .by { font-size: 11px; color: var(--ink-3); }
+    .v-propose .arr {
+      display: grid;
+      place-items: center;
+      color: var(--accent);
+    }
+    .v-propose .note {
+      background: #fff;
+      border-radius: var(--r-sm);
+      padding: 10px 12px;
+      font-size: 12px;
+      color: var(--ink-2);
+      line-height: 1.45;
+    }
+
+    /* visual 3 — thread */
+    .v-thread {
+      width: 100%;
+      background: var(--bg-elev);
+      border-radius: var(--r-lg);
+      padding: 14px;
+      display: grid;
+      gap: 8px;
+    }
+    .v-msg {
+      display: flex;
+      gap: 8px;
+      align-items: flex-end;
+    }
+    .v-msg .av {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      font-size: 10px;
+      font-weight: 600;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .v-msg.them .av { background: #ff9500; }
+    .v-msg.me .av { background: var(--accent); }
+    .v-msg.me { flex-direction: row-reverse; }
+    .v-msg .bubble {
+      max-width: 78%;
+      padding: 8px 12px;
+      border-radius: 14px;
+      font-size: 12.5px;
+      line-height: 1.4;
+    }
+    .v-msg.them .bubble {
+      background: #fff;
+      color: var(--ink);
+      border-bottom-left-radius: 4px;
+    }
+    .v-msg.me .bubble {
+      background: var(--accent);
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+    .v-settle {
+      margin-top: 6px;
+      padding: 10px 12px;
+      background: rgba(52,199,89,0.08);
+      border-radius: var(--r-sm);
+      display: grid;
+      grid-template-columns: 16px 1fr auto;
+      gap: 10px;
+      align-items: center;
+      font-size: 12px;
+      color: var(--ink);
+    }
+    .v-settle .check { color: #34c759; }
+    .v-settle b { font-weight: 500; }
+    .v-settle span { color: var(--ink-3); margin-left: 4px; }
+
+    /* ---------- manifesto ---------- */
+    .manifesto {
+      background: var(--bg-dark);
+      color: var(--ink-on-dark);
+      padding: 160px 0;
+    }
+    @media (max-width: 720px) { .manifesto { padding: 100px 0; } }
+    .manifesto-inner {
+      max-width: 880px;
+      margin: 0 auto;
+      padding: 0 22px;
+      text-align: center;
+    }
+    .manifesto blockquote {
+      margin: 0;
+      font-size: clamp(28px, 3.4vw, 44px);
+      font-weight: 500;
+      letter-spacing: -0.028em;
+      line-height: 1.18;
+      color: var(--ink-on-dark);
+    }
+    .manifesto blockquote em {
+      font-style: normal;
+      color: #7aaaff;
+    }
+    .manifesto blockquote .strike {
+      color: rgba(245,245,247,0.4);
+      text-decoration: line-through;
+      text-decoration-thickness: 2px;
+      text-decoration-color: rgba(245,245,247,0.35);
+    }
+    .manifesto .sig {
+      margin-top: 40px;
+      font-size: 13px;
+      color: var(--ink-on-dark-2);
+      letter-spacing: -0.005em;
+    }
+
+    /* ---------- activity ---------- */
+    .activity-section {
+      padding: 100px 0;
+      background: var(--bg);
+    }
+    @media (max-width: 720px) { .activity-section { padding: 64px 0; } }
+    .activity-head {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+    .activity-head .live {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #34c759;
+      margin-bottom: 12px;
+    }
+    .activity-head .live .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #34c759;
+      animation: pulse 2.4s ease-out infinite;
+    }
+    .activity-head h2 {
+      font-size: clamp(28px, 3.2vw, 40px);
+      letter-spacing: -0.026em;
+      margin: 0 auto 12px;
+      max-width: 20ch;
+    }
+    .activity-head p {
+      font-size: 16px;
+      color: var(--ink-3);
+      margin: 0 auto;
+      max-width: 38ch;
+    }
+
+    .activity-log {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 0 22px;
+    }
+    .activity-card {
+      background: var(--bg-elev);
+      border-radius: var(--r-2xl);
+      padding: 8px;
+    }
+    .log-row {
+      display: grid;
+      grid-template-columns: 36px 1fr auto;
+      gap: 14px;
+      align-items: center;
+      padding: 14px 18px;
+      border-radius: var(--r-md);
+      transition: background .2s var(--ease);
+    }
+    .log-row:hover { background: #fff; }
+    .log-row + .log-row {
+      border-top: 1px solid var(--hairline);
+    }
+    .log-row:hover + .log-row,
+    .log-row:has(+ .log-row:hover) { border-top-color: transparent; }
+    .log-row .avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      color: #fff;
+      display: grid;
+      place-items: center;
+      font-size: 13px;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+    .av-1 { background: linear-gradient(135deg, #ff9500, #ff3b30); }
+    .av-2 { background: linear-gradient(135deg, #5856d6, #af52de); }
+    .av-3 { background: linear-gradient(135deg, #34c759, #30b0c7); }
+    .av-4 { background: linear-gradient(135deg, #007aff, #5856d6); }
+    .av-5 { background: linear-gradient(135deg, #ff2d55, #ff9500); }
+
+    .log-row .body { font-size: 14.5px; letter-spacing: -0.005em; color: var(--ink-2); line-height: 1.4; }
+    .log-row .body b { font-weight: 600; color: var(--ink); }
+    .log-row .body .verb { color: var(--accent); font-weight: 500; }
+    .log-row .time { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+
+    /* ---------- cta ---------- */
+    .cta-section {
+      padding: 160px 0;
+      text-align: center;
+      background: linear-gradient(180deg, var(--bg) 0%, var(--bg-elev) 100%);
+    }
+    @media (max-width: 720px) { .cta-section { padding: 100px 0; } }
+    .cta-section h2 {
+      max-width: 14ch;
+      margin: 0 auto 22px;
+    }
+    .cta-section .lede {
+      max-width: 40ch;
+      margin: 0 auto 40px;
+    }
+    .cta-form {
+      max-width: 480px;
+      margin: 0 auto;
+      display: grid;
+      gap: 12px;
+    }
+    .cta-input-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      background: #fff;
+      border-radius: var(--r-pill);
+      padding: 4px 4px 4px 22px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px -8px rgba(0,0,0,0.08);
+      align-items: center;
+      transition: box-shadow .25s var(--ease);
+    }
+    .cta-input-row:focus-within {
+      box-shadow: 0 0 0 4px rgba(0,113,227,0.12), 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px -8px rgba(0,0,0,0.08);
+    }
+    .cta-input-row input {
+      border: 0;
+      background: transparent;
+      width: 100%;
+      padding: 14px 0;
+      font-size: 15px;
+      letter-spacing: -0.01em;
+    }
+    .cta-input-row input:focus { outline: none; }
+    .cta-input-row input::placeholder { color: var(--ink-3); }
+    .cta-input-row button {
+      background: var(--accent);
+      color: #fff;
+      padding: 12px 24px;
+      border-radius: var(--r-pill);
+      font-size: 14px;
+      font-weight: 500;
+      transition: background .2s var(--ease), transform .25s var(--ease);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .cta-input-row button:hover { background: var(--accent-hover); }
+    .cta-input-row button:active { transform: scale(0.97); }
+    .cta-help {
+      font-size: 12px;
+      color: var(--ink-3);
+      letter-spacing: -0.005em;
+    }
+    .cta-help a { color: var(--accent); }
+
+    /* ---------- footer ---------- */
+    footer {
+      background: var(--bg-elev);
+      color: var(--ink-2);
+      padding: 56px 0 28px;
+      font-size: 12px;
+      line-height: 1.5;
+      border-top: 1px solid var(--hairline);
+    }
+    .foot-inner {
+      max-width: var(--maxw-wide);
+      margin: 0 auto;
+      padding: 0 22px;
+    }
+    .foot-top {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 32px;
+      padding-bottom: 32px;
+      border-bottom: 1px solid var(--hairline);
+    }
+    .foot-disclaimer {
+      max-width: 60ch;
+      color: var(--ink-3);
+    }
+    .foot-disclaimer a { color: var(--ink-2); text-decoration: underline; text-underline-offset: 2px; }
+    .foot-cols {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 32px;
+    }
+    @media (max-width: 720px) { .foot-cols { grid-template-columns: repeat(2, 1fr); } }
+    .foot-cols h5 {
+      margin: 0 0 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--ink);
+      letter-spacing: -0.005em;
+    }
+    .foot-cols ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+    .foot-cols a {
+      color: var(--ink-3);
+      font-size: 12px;
+      transition: color .2s var(--ease);
+    }
+    .foot-cols a:hover { color: var(--ink); }
+
+    .foot-bottom {
+      padding-top: 24px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 20px;
+      align-items: center;
+      color: var(--ink-3);
+    }
+    @media (max-width: 720px) { .foot-bottom { grid-template-columns: 1fr; } }
+    .foot-legals { display: flex; gap: 18px; }
+    .foot-legals a:hover { color: var(--ink); }
+
+    /* ---------- scroll reveal ---------- */
+    .reveal {
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity .8s var(--ease), transform .8s var(--ease);
+      will-change: opacity, transform;
+    }
+    .reveal.in {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .reveal { opacity: 1; transform: none; transition: none; }
+      .product-card .photo img,
+      .tile-photo img { transition: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ============ nav ============ -->
+  <nav class="nav" aria-label="Main">
+    <div class="nav-inner">
+      <a class="nav-brand" href="#">
+        <span class="dot"></span>
+        esharevice
+      </a>
+      <div class="nav-links">
+        <a class="nav-link" href="#listings">Browse</a>
+        <a class="nav-link" href="#how">How it works</a>
+        <a class="nav-link" href="#activity">Live</a>
+        <a class="nav-link" href="#cta">Neighbourhoods</a>
+      </div>
+      <div class="nav-cta">
+        <a class="sign-in" href="#cta">Sign in</a>
+        <a class="btn btn-primary" style="padding: 8px 16px; font-size: 13px;" href="#cta">
+          Open a trade
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ============ hero ============ -->
+  <section class="hero">
+    <div class="wrap reveal">
+      <div class="eyebrow">Now in Cardiff &amp; Swansea</div>
+      <h1 class="display-xl">The neighbourhood, exchanged.</h1>
+      <p class="lede">
+        A service-exchange ledger for neighbours who'd rather barter than buy.
+        List what you have. Borrow what's two streets over. Settle however you decide.
+      </p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="#listings">
+          Browse what's nearby
+        </a>
+        <a class="btn btn-ghost" href="#how">
+          Learn more
+          <svg class="arr" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg>
+        </a>
+      </div>
+    </div>
+
+    <!-- hero stage / featured listing -->
+    <div class="hero-canvas reveal">
+      <div class="hero-stage">
+        <div class="hero-stage-grid">
+          <div class="hero-stage-text">
+            <div class="stage-eyebrow">Featured this week</div>
+            <h2>A six-year sourdough lineage, half a mile from your door.</h2>
+            <p>
+              Real listings from real neighbours, weighted by what they're offering and what they need in return.
+              Nothing extractive. No paid placement.
+            </p>
+            <div class="stage-stat-row">
+              <div class="stage-stat">
+                <div class="k">Active trades</div>
+                <div class="v">1,427</div>
+              </div>
+              <div class="stage-stat">
+                <div class="k">Avg. distance</div>
+                <div class="v">0.6&thinsp;mi</div>
+              </div>
+              <div class="stage-stat">
+                <div class="k">Settled in 48h</div>
+                <div class="v">94%</div>
+              </div>
+            </div>
+          </div>
+
+          <article class="product-card">
+            <div class="photo">
+              <span class="live-tag"><span class="dot"></span> Live · 4 watching</span>
+              <img src="https://picsum.photos/seed/sourdough-mei/720/580" alt="A jar of well-kept sourdough starter on a wooden counter" />
+            </div>
+            <div class="body">
+              <div class="who">
+                <div class="avatar">M</div>
+                <div class="meta">
+                  <b>Mei-Lin Wong</b>
+                  <span>Pontcanna · 0.3 mi · joined Mar '26</span>
+                </div>
+              </div>
+              <h3 class="title">Wood-fired sourdough starter — six-year lineage, fed Tuesdays &amp; Fridays.</h3>
+              <div class="swap-grid">
+                <div class="swap-row">
+                  <div class="lbl">Offers</div>
+                  <div class="val">Two-week handoff with a written feeding card + 1hr walkthrough.</div>
+                </div>
+                <div class="swap-row">
+                  <div class="lbl">Wants</div>
+                  <div class="val want">Help re-grouting a bathroom (half-day) — or a comparable trade.</div>
+                </div>
+              </div>
+              <div class="actions">
+                <a class="open" href="#cta">
+                  Open the trade
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg>
+                </a>
+                <button class="save" aria-label="Save to watchlist" title="Save to watchlist">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+                </button>
+              </div>
+            </div>
+          </article>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ listings ============ -->
+  <section class="section" id="listings">
+    <div class="wrap reveal">
+      <div class="section-head">
+        <div class="eyebrow">Listings near you</div>
+        <h2 class="display-lg">Six things your neighbours will trade this week.</h2>
+        <p class="lede">
+          Filter by what people want in return — often the swap is what makes the trade make sense.
+        </p>
+        <div class="segmented-wrap">
+          <div class="segmented" role="tablist">
+            <button class="seg active" role="tab" aria-selected="true">Everything</button>
+            <button class="seg" role="tab">Tools</button>
+            <button class="seg" role="tab">Skills</button>
+            <button class="seg" role="tab">Edible</button>
+            <button class="seg" role="tab">≤ 0.5 mi</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="highlights reveal">
+
+      <!-- t1 — feature, hero -->
+      <article class="tile t1 feature">
+        <div class="tile-photo">
+          <span class="tile-corner">Featured · Crash pad</span>
+          <img src="https://picsum.photos/seed/crashpad-theo/1100/720" alt="A bouldering crash pad leaning against a brick wall" />
+        </div>
+        <div class="tile-body">
+          <div class="tile-meta">
+            <b>Theo Kallenbach</b><span class="sep"></span> Cathays · 1.1 mi <span class="sep"></span> 6 verified swaps
+          </div>
+          <h3 class="tile-ttl">Bouldering crash pad — weekend loan, padded, no foam compression.</h3>
+          <div class="tile-swap">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+            <span>wants <em>a cooked meal (veg)</em> — or a 3hr car-share to the Gower</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- t2 — dark -->
+      <article class="tile t2 dark">
+        <div class="tile-photo"><img src="https://picsum.photos/seed/singer-bastian/640/400" alt="A vintage Singer sewing machine on a workbench" /></div>
+        <div class="tile-body">
+          <h3 class="tile-ttl">Singer 401A — fully mended, takes denim like butter.</h3>
+          <div class="tile-meta"><b>Bastian Reuter</b><span class="sep"></span> Grangetown · 0.8 mi</div>
+          <div class="tile-swap">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+            <span>wants <em>4hr of garden weeding</em></span>
+          </div>
+        </div>
+      </article>
+
+      <!-- t3 -->
+      <article class="tile t3">
+        <div class="tile-photo"><img src="https://picsum.photos/seed/espresso-soraya/640/400" alt="A close-up of an espresso shot being pulled" /></div>
+        <div class="tile-body">
+          <h3 class="tile-ttl">Espresso pulling, one-on-one — 2hr session on a La Pavoni.</h3>
+          <div class="tile-meta"><b>Soraya Khoury</b><span class="sep"></span> Roath · 0.5 mi</div>
+          <div class="tile-swap">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+            <span>wants <em>Hebrew conversation partner</em> — weekly, 45min</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- t4 — second feature, light -->
+      <article class="tile t4 feature">
+        <div class="tile-photo">
+          <span class="tile-corner">Field gear</span>
+          <img src="https://picsum.photos/seed/zoomf3-anais/1100/720" alt="A handheld field recorder with a DPA microphone pair" />
+        </div>
+        <div class="tile-body">
+          <div class="tile-meta">
+            <b>Anaïs Trindade</b><span class="sep"></span> Riverside · 1.4 mi
+          </div>
+          <h3 class="tile-ttl">Zoom F3 + DPA pair — field-recording rig, weekend loan.</h3>
+          <div class="tile-swap">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+            <span>wants <em>a portrait sitting</em> — 35mm, late afternoon</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- t5 -->
+      <article class="tile t5">
+        <div class="tile-photo"><img src="https://picsum.photos/seed/pottery-ezekiel/520/360" alt="Hands at a pottery wheel shaping clay" /></div>
+        <div class="tile-body">
+          <h3 class="tile-ttl">Pottery wheel time — kiln included, up to 3&thinsp;kg.</h3>
+          <div class="tile-meta"><b>Ezekiel Okafor</b><span class="sep"></span> Splott · 0.9 mi</div>
+          <div class="tile-swap">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+            <span>wants <em>bike tune-up</em></span>
+          </div>
+        </div>
+      </article>
+
+      <!-- t6 -->
+      <article class="tile t6">
+        <div class="tile-photo"><img src="https://picsum.photos/seed/mandarin-priya/520/360" alt="An open notebook with handwritten Mandarin characters" /></div>
+        <div class="tile-body">
+          <h3 class="tile-ttl">Mandarin conversation — native speaker, 1hr / week.</h3>
+          <div class="tile-meta"><b>Priya Ramachandran</b><span class="sep"></span> Plasnewydd · 0.2 mi</div>
+          <div class="tile-swap">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+            <span>wants <em>help moving an upright piano</em></span>
+          </div>
+        </div>
+      </article>
+
+      <!-- t7 -->
+      <article class="tile t7">
+        <div class="tile-photo"><img src="https://picsum.photos/seed/teaching-marisol/520/360" alt="A loaf of sourdough cooling on a rack" /></div>
+        <div class="tile-body">
+          <h3 class="tile-ttl">Sourdough teaching — 3hr, your kitchen.</h3>
+          <div class="tile-meta"><b>Marisol Avendaño</b><span class="sep"></span> Cathays · 0.7 mi</div>
+          <div class="tile-swap">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+            <span>wants <em>Spanish-language tutoring</em> — child, age 8</span>
+          </div>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- ============ how it works ============ -->
+  <section class="how-section" id="how">
+    <div class="wrap reveal">
+      <div class="section-head">
+        <div class="eyebrow">How it works</div>
+        <h2 class="display-lg">Three steps. No tokens. No algorithm.</h2>
+        <p class="lede">
+          Trades are negotiated by the two people involved. We handle discovery and the ledger. The rest is on you and your neighbour.
+        </p>
+      </div>
+    </div>
+
+    <div class="how-grid reveal">
+      <!-- step 1 -->
+      <div class="step-card">
+        <div class="step-num">Step 01</div>
+        <h3>Find the thing that already exists nearby.</h3>
+        <p>Search is full-text, weighted by what each listing offers and what its provider needs in return.</p>
+        <div class="step-visual">
+          <div class="v-search">
+            <div class="v-search-bar">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+              <input type="text" value="sourdough" readonly aria-label="Search" />
+              <span class="kbd">⌘ K</span>
+            </div>
+            <div class="v-search-row">
+              <div class="ic">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h10"/></svg>
+              </div>
+              <div class="t"><b>Wood-fired starter — six-year lineage</b><span>Mei-Lin Wong</span></div>
+              <div class="dist">0.3 mi</div>
+            </div>
+            <div class="v-search-row">
+              <div class="ic">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M5 9l7-7 7 7"/></svg>
+              </div>
+              <div class="t"><b>Sourdough teaching — 3hr</b><span>Marisol Avendaño</span></div>
+              <div class="dist">0.7 mi</div>
+            </div>
+            <div class="v-search-row">
+              <div class="ic">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/></svg>
+              </div>
+              <div class="t"><b>Looking for sourdough weekly</b><span>Theo Kallenbach</span></div>
+              <div class="dist">1.1 mi</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- step 2 -->
+      <div class="step-card">
+        <div class="step-num">Step 02</div>
+        <h3>Propose a trade with a real human.</h3>
+        <p>Tell them what you have and what you'd like in return. Either side can counter. The thread keeps the receipts.</p>
+        <div class="step-visual">
+          <div class="v-propose">
+            <div class="row">
+              <div class="v-cell">
+                <div class="lbl">You offer</div>
+                <div class="ttl">Half-day garden weeding</div>
+                <div class="by">from your listing</div>
+              </div>
+              <div class="arr">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+              </div>
+              <div class="v-cell">
+                <div class="lbl">In return</div>
+                <div class="ttl">Singer 401A — 2 week loan</div>
+                <div class="by">Bastian Reuter</div>
+              </div>
+            </div>
+            <div class="note">"Happy to pick it up Saturday after 11. I'll bring my own bobbins. — M."</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- step 3 -->
+      <div class="step-card">
+        <div class="step-num">Step 03</div>
+        <h3>Settle however you settled on.</h3>
+        <p>Money isn't required and never touches the platform. When both sides mark settled, it joins your ledger.</p>
+        <div class="step-visual">
+          <div class="v-thread">
+            <div class="v-msg them">
+              <div class="av">B</div>
+              <div class="bubble">Gate's unlatched, machine's on the bench.</div>
+            </div>
+            <div class="v-msg me">
+              <div class="av">M</div>
+              <div class="bubble">Picked it up. Coffee's on the table — thank you.</div>
+            </div>
+            <div class="v-msg them">
+              <div class="av">B</div>
+              <div class="bubble">Weeding looks tidy. Calling it square?</div>
+            </div>
+            <div class="v-settle">
+              <svg class="check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12l5 5L20 6"/></svg>
+              <span><b>Both sides agreed.</b><span>Trade #4,218 settled.</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ manifesto ============ -->
+  <section class="manifesto">
+    <div class="manifesto-inner reveal">
+      <blockquote>
+        The street already has the espresso machine, the wheelbarrow, the sourdough, the <em>Mandarin tutor</em>, the field-recording rig, the patience.
+        The market told us we needed <span class="strike">a new one each</span> — we believed it for a while. esharevice is the quiet correction.
+      </blockquote>
+      <div class="sig">— from the project README · 2026-05-12</div>
+    </div>
+  </section>
+
+  <!-- ============ activity ============ -->
+  <section class="activity-section" id="activity">
+    <div class="wrap reveal">
+      <div class="activity-head">
+        <div class="live"><span class="dot"></span> Live</div>
+        <h2 class="display-md">Last hour, across Cardiff.</h2>
+        <p>Five trades, none of them you. Yet.</p>
+      </div>
+    </div>
+    <div class="activity-log reveal">
+      <div class="activity-card">
+        <div class="log-row">
+          <div class="avatar av-1">M</div>
+          <div class="body"><b>Marisol Avendaño</b> <span class="verb">borrowed</span> a Sewmor 600 from <b>Bastian Reuter</b></div>
+          <div class="time">14m</div>
+        </div>
+        <div class="log-row">
+          <div class="avatar av-2">T</div>
+          <div class="body"><b>Theo Kallenbach</b> <span class="verb">listed</span> a Zoom F3 field rig in Riverside</div>
+          <div class="time">38m</div>
+        </div>
+        <div class="log-row">
+          <div class="avatar av-3">S</div>
+          <div class="body"><b>Soraya Khoury</b> <span class="verb">pulled</span> espresso for <b>Anaïs Trindade</b> — settled in portrait sittings</div>
+          <div class="time">1h</div>
+        </div>
+        <div class="log-row">
+          <div class="avatar av-4">E</div>
+          <div class="body"><b>Ezekiel Okafor</b> <span class="verb">tuned</span> <b>Priya Ramachandran</b>'s rear derailleur</div>
+          <div class="time">1h 12m</div>
+        </div>
+        <div class="log-row">
+          <div class="avatar av-5">M</div>
+          <div class="body"><b>Mei-Lin Wong</b> <span class="verb">handed off</span> a sourdough starter to <b>Cosima Vergara</b></div>
+          <div class="time">2h</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ cta ============ -->
+  <section class="cta-section" id="cta">
+    <div class="wrap reveal">
+      <div class="eyebrow">Request access</div>
+      <h2 class="display-lg">Open a trade.<br/>The block is already on it.</h2>
+      <p class="lede">
+        Invite-only while we keep neighbourhoods dense. Your code arrives within a day if a vouched neighbour is already on the platform.
+      </p>
+
+      <form class="cta-form" onsubmit="event.preventDefault();">
+        <label class="cta-input-row">
+          <input type="email" placeholder="you@street.co.uk" autocomplete="email" aria-label="Email" />
+          <button type="submit">
+            Request access
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 5l7 7-7 7"/></svg>
+          </button>
+        </label>
+        <div class="cta-help">No code? We'll waitlist you and ask a neighbour. <a href="#">Learn more</a>.</div>
+      </form>
+    </div>
+  </section>
+
+  <!-- ============ footer ============ -->
+  <footer>
+    <div class="foot-inner">
+      <div class="foot-top">
+        <div class="foot-cols">
+          <div>
+            <h5>Product</h5>
+            <ul>
+              <li><a href="#listings">Browse listings</a></li>
+              <li><a href="#how">How it works</a></li>
+              <li><a href="#">Open a listing</a></li>
+              <li><a href="#">The ledger</a></li>
+            </ul>
+          </div>
+          <div>
+            <h5>Neighbourhoods</h5>
+            <ul>
+              <li><a href="#">Cardiff · 8 areas</a></li>
+              <li><a href="#">Swansea · 3 areas</a></li>
+              <li><a href="#">Bristol · waitlist</a></li>
+              <li><a href="#">Request your street</a></li>
+            </ul>
+          </div>
+          <div>
+            <h5>House rules</h5>
+            <ul>
+              <li><a href="#">The trust ledger</a></li>
+              <li><a href="#">Disputes &amp; vouching</a></li>
+              <li><a href="#">What we don't list</a></li>
+              <li><a href="#">Safety walk-through</a></li>
+            </ul>
+          </div>
+          <div>
+            <h5>Background</h5>
+            <ul>
+              <li><a href="#">The co-operative</a></li>
+              <li><a href="#">Open numbers</a></li>
+              <li><a href="#">Writing &amp; press</a></li>
+              <li><a href="mailto:hello@esharevice.com">hello@esharevice.com</a></li>
+            </ul>
+          </div>
+        </div>
+        <div class="foot-disclaimer">
+          A small registered co-operative experimenting with what a service-exchange ledger looks like when nobody on it is trying to extract.
+          Read <a href="#">our principles</a>.
+        </div>
+      </div>
+      <div class="foot-bottom">
+        <div>© 2026 esharevice co-operative. No data brokered, ever. Drawn in Cardiff.</div>
+        <div class="foot-legals">
+          <a href="#">Terms</a>
+          <a href="#">Privacy</a>
+          <a href="#">Cookies</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Subtle scroll-reveal — single observer, idempotent.
+    (function () {
+      if (typeof IntersectionObserver === "undefined") return;
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) {
+            e.target.classList.add("in");
+            io.unobserve(e.target);
+          }
+        });
+      }, { rootMargin: "0px 0px -8% 0px", threshold: 0.05 });
+      document.querySelectorAll(".reveal").forEach(function (el) { io.observe(el); });
+    })();
+
+    // Segmented control — just visual toggle, no real filtering in the mockup.
+    document.querySelectorAll(".segmented").forEach(function (group) {
+      group.addEventListener("click", function (e) {
+        var t = e.target.closest(".seg");
+        if (!t) return;
+        group.querySelectorAll(".seg").forEach(function (b) {
+          b.classList.remove("active");
+          b.setAttribute("aria-selected", "false");
+        });
+        t.classList.add("active");
+        t.setAttribute("aria-selected", "true");
+      });
+    });
+  </script>
+</body>
+</html>

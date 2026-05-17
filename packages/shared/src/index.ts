@@ -1,6 +1,7 @@
 export * from "./schemas/user";
 export * from "./schemas/category";
 export * from "./schemas/exchange-item";
+export * from "./schemas/booking";
 export * from "./schemas/pagination";
 export * from "./schemas/problem";
 export * from "./schemas/saved";

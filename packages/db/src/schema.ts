@@ -63,6 +63,19 @@ export const locationPrecisionEnum = pgEnum("location_precision", [
 ]);
 export type LocationPrecision = (typeof locationPrecisionEnum.enumValues)[number];
 
+// ─────────────────────── Bookings enum (migration 0008)
+
+export const bookingStatusEnum = pgEnum("booking_status", [
+  "requested",
+  "confirmed",
+  "active",
+  "returned",
+  "completed",
+  "declined",
+  "cancelled",
+]);
+export type BookingStatus = (typeof bookingStatusEnum.enumValues)[number];
+
 // ─────────────────────── Tables
 
 export const users = pgTable(
@@ -279,6 +292,78 @@ export const messages = pgTable(
   ],
 );
 
+/**
+ * bookings — the time-range reservation table for rent/hire/sell.
+ *
+ * The load-bearing invariant lives in SQL: a partial `EXCLUDE USING gist`
+ * constraint that makes overlapping bookings on the same item impossible
+ * while a booking holds an "active" claim (requested/confirmed/active).
+ * Drizzle can't express EXCLUDE constraints, so the constraint is defined
+ * in migration 0008_0001_bookings.sql and trusted at the application layer.
+ *
+ * `provider_id` is denormalised from `exchange_items.user_id` so the
+ * "my incoming bookings" query is a single index seek instead of a join.
+ * Trade-off accepted because providers don't change on listings.
+ *
+ * Money is stored in cents-CAD per the Toronto launch decision. Stripe
+ * linkage columns are placeholders here; PR 4 fills them in.
+ */
+export const bookings = pgTable(
+  "bookings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    item_id: uuid("item_id")
+      .notNull()
+      .references(() => exchangeItems.id, { onDelete: "restrict" }),
+    renter_id: uuid("renter_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    provider_id: uuid("provider_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    status: bookingStatusEnum("status").notNull().default("requested"),
+    // Nullable for sell purchases (instantaneous); paired by the
+    // `bookings_date_pair` CHECK constraint — both NULL or both non-null.
+    start_at: timestamp("start_at", { withTimezone: true }),
+    end_at: timestamp("end_at", { withTimezone: true }),
+    // Pricing snapshot — immutable post-create. price_unit is nullable
+    // because sells are implicitly "fixed" and don't carry the field.
+    price_cents: integer("price_cents").notNull(),
+    price_unit: priceUnitEnum("price_unit"),
+    quantity: integer("quantity").notNull().default(1),
+    subtotal_cents: integer("subtotal_cents").notNull(),
+    platform_fee_cents: integer("platform_fee_cents").notNull(),
+    // Set at Stripe capture time in PR 4; nullable here.
+    stripe_fee_cents: integer("stripe_fee_cents"),
+    deposit_cents: integer("deposit_cents").notNull().default(0),
+    total_cents: integer("total_cents").notNull(),
+    currency: text("currency").notNull().default("CAD"),
+    // Stripe placeholders — PR 4 wires the actual Stripe calls.
+    stripe_payment_intent_id: text("stripe_payment_intent_id"),
+    stripe_charge_id: text("stripe_charge_id"),
+    stripe_transfer_id: text("stripe_transfer_id"),
+    // Notes / reasons
+    message_to_provider: text("message_to_provider"),
+    decline_reason: text("decline_reason"),
+    cancel_reason: text("cancel_reason"),
+    cancelled_by: uuid("cancelled_by").references(() => users.id, { onDelete: "set null" }),
+    // Lifecycle — each transition sets one
+    requested_at: timestamp("requested_at", { withTimezone: true }).notNull().defaultNow(),
+    confirmed_at: timestamp("confirmed_at", { withTimezone: true }),
+    active_at: timestamp("active_at", { withTimezone: true }),
+    returned_at: timestamp("returned_at", { withTimezone: true }),
+    completed_at: timestamp("completed_at", { withTimezone: true }),
+    declined_at: timestamp("declined_at", { withTimezone: true }),
+    cancelled_at: timestamp("cancelled_at", { withTimezone: true }),
+    created_at: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updated_at: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  () => [
+    // Listing indexes live in migration 0008 SQL because they use partial
+    // WHERE predicates that drizzle-kit can't currently express.
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Category = typeof categories.$inferSelect;
@@ -291,6 +376,8 @@ export type ConversationRow = typeof conversations.$inferSelect;
 export type NewConversationRow = typeof conversations.$inferInsert;
 export type MessageRow = typeof messages.$inferSelect;
 export type NewMessageRow = typeof messages.$inferInsert;
+export type BookingRow = typeof bookings.$inferSelect;
+export type NewBookingRow = typeof bookings.$inferInsert;
 
 // Re-export sql for callers that want to reach for it from one place.
 export { sql };

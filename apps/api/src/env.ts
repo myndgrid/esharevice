@@ -79,6 +79,19 @@ const EnvSchema = z.object({
       const norm = (v ?? "").trim().toLowerCase();
       return norm === "1" || norm === "true" || norm === "yes" || norm === "on";
     }),
+
+  // FEATURE_BOOKINGS — gates the /v1/bookings endpoints (404 when off) and
+  // the bookings-activate / bookings-complete cron jobs (no-op when off).
+  // Schema (migration 0008) lives in prod from day one; only the routes +
+  // crons gate on this flag. PR 11 flips it to true after Stripe Connect
+  // (PR 4) and the booking flow UI (PR 9) are wired end-to-end.
+  FEATURE_BOOKINGS: z
+    .string()
+    .optional()
+    .transform((v): boolean => {
+      const norm = (v ?? "").trim().toLowerCase();
+      return norm === "1" || norm === "true" || norm === "yes" || norm === "on";
+    }),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

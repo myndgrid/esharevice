@@ -147,11 +147,23 @@ export const api = {
       revalidate: false,
     }),
 
-  listExchangeItems: (opts: { cursor?: string; limit?: number; q?: string } = {}) => {
+  listExchangeItems: (
+    opts: {
+      cursor?: string;
+      limit?: number;
+      q?: string;
+      /** "gift"/"trade"/"rent"/"hire"/"sell" — pass-through to the API filter. */
+      listing_type?: string;
+      /** Category slug from /v1/categories — pass-through filter. */
+      category_slug?: string;
+    } = {},
+  ) => {
     const params = new URLSearchParams();
     if (opts.cursor) params.set("cursor", opts.cursor);
     if (opts.limit) params.set("limit", String(opts.limit));
     if (opts.q) params.set("q", opts.q);
+    if (opts.listing_type) params.set("listing_type", opts.listing_type);
+    if (opts.category_slug) params.set("category_slug", opts.category_slug);
     const qs = params.toString() ? `?${params.toString()}` : "";
     return call(`/v1/exchange-items${qs}`, cursorPage(ExchangeItem), {
       authed: false,

@@ -20,6 +20,7 @@ export {
   type ListingTypeChipValue,
 } from "./listing-type-chips";
 export { LiveCard, type LiveCardProps } from "./live-card";
+export { ListingCard, type ListingCardProps } from "./listing-card";
 export { HoodTile, type HoodTileProps } from "./hood-tile";
 export { MobileTabBar, type MobileTabBarProps, type MobileTabBarTab } from "./mobile-tab-bar";
 export { TrustSignalsRow, type TrustSignalsRowProps } from "./trust-signals-row";

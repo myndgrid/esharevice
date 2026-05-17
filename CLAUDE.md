@@ -1023,6 +1023,13 @@ Same guard applies to ANY redirect built from a request parameter or stored valu
 
 ---
 
+### [State] OIDC Provider Swap — Same Human, Different `sub`, Email UNIQUE Wins
+**Description:** Migrating users from one OIDC provider to another (e.g. Authentik → Auth.js Google) the same human signs into the same email via the new provider. The new IdP issues a different `sub` (e.g. `google:1234…` instead of an Authentik UUID). The lazy-provisioning function's `findOrCreate by sub` lookup fails (no row with the new sub), falls through to INSERT, and **fails on the email UNIQUE constraint** (23505 / users_email_uq). The signIn callback returns false, the user sees `AccessDenied`. From the user's perspective: "I just signed up with Google and it rejected me." From the dev's perspective: their account already exists, but bound to the old sub.
+**Avoid:** When the incoming sub is in the NEW provider's format, look up by email too. If a row exists with that email AND its current `oidc_sub` is in the OLD provider's format, update the row's `oidc_sub` to the new form (the merge). If the existing row's sub is ALREADY in the new provider's format, refuse the merge and let the INSERT fail cleanly — silently overwriting the canonical sub on cross-provider email collisions breaks the original provider's future logins. Detection rule: bucket sub formats by provider prefix; merge only crosses provider boundaries, never within. See `apps/api/src/lib/users.ts::resolveUserFromSub` for the implementation.
+Same shape applies to any identity-provider rotation (Auth0 → Clerk, Cognito → Auth.js, ad infinitum) where the canonical sub format changes but the email stays stable.
+
+---
+
 ## Debugging Protocol
 
 > Before touching any code — **reproduce first, locate second, fix last.**

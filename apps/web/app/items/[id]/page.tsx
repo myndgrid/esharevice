@@ -97,7 +97,7 @@ export default async function ItemDetailPage({ params, searchParams }: Props): P
               <Button variant="ghost" size="sm">Back</Button>
             </Link>
             {!session && (
-              <Link href={`/api/auth/login?return_to=${encodeURIComponent(`/items/${item.id}`)}`} prefetch={false}>
+              <Link href={`/login?callbackUrl=${encodeURIComponent(`/items/${item.id}`)}`} prefetch={false}>
                 <Button variant="brand" size="sm">Sign in to reserve</Button>
               </Link>
             )}

@@ -39,7 +39,7 @@ export async function toggleSaveAction(
     return { ok: true, saved: result.saved };
   } catch (err) {
     if (err instanceof ApiError && err.status === 401) {
-      redirect(`/api/auth/login?return_to=${encodeURIComponent(`/items/${itemId}`)}`);
+      redirect(`/login?callbackUrl=${encodeURIComponent(`/items/${itemId}`)}`);
     }
     if (err instanceof ApiError && err.status === 404) {
       return { ok: false, error: "This item no longer exists." };

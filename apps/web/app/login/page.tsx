@@ -20,7 +20,10 @@ import { signInGoogleAction, signInResendAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-type SearchParams = { error?: string; callbackUrl?: string };
+// `return_to` is accepted as an alias for `callbackUrl` so legacy Authentik
+// callers (which used return_to) keep working through the cutover without
+// having to rewrite every redirect. callbackUrl wins when both are set.
+type SearchParams = { error?: string; callbackUrl?: string; return_to?: string };
 
 const ERROR_MESSAGES: Record<string, string> = {
   AccessDenied: "We couldn't sign you in. The account may not be authorized yet.",
@@ -37,6 +40,9 @@ export default async function LoginPage({
   const params = await searchParams;
   const errorKey = params.error;
   const errorMsg = errorKey ? ERROR_MESSAGES[errorKey] ?? ERROR_MESSAGES.Default : null;
+  // Resolve the post-login destination. Auth.js convention is `callbackUrl`;
+  // legacy callers use `return_to`. callbackUrl wins when both are present.
+  const callbackUrl = params.callbackUrl ?? params.return_to ?? "/";
 
   // Auth.js exposes the configured provider IDs by importing the auth
   // config and calling `.providers`. We avoid that import here to keep
@@ -68,7 +74,7 @@ export default async function LoginPage({
 
             {googleEnabled && (
               <form action={signInGoogleAction}>
-                <input type="hidden" name="callbackUrl" value={params.callbackUrl ?? "/"} />
+                <input type="hidden" name="callbackUrl" value={callbackUrl} />
                 <Button type="submit" variant="brand" size="lg" className="w-full">
                   <GoogleIcon /> Continue with Google
                 </Button>
@@ -85,7 +91,7 @@ export default async function LoginPage({
 
             {emailEnabled ? (
               <form action={signInResendAction} className="grid gap-3">
-                <input type="hidden" name="callbackUrl" value={params.callbackUrl ?? "/"} />
+                <input type="hidden" name="callbackUrl" value={callbackUrl} />
                 <label htmlFor="email" className="grid gap-1.5">
                   <span className="text-sm font-medium text-fg">Email</span>
                   <input

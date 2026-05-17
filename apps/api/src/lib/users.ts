@@ -33,25 +33,46 @@ export async function resolveUserFromSub(
   const existing = await db.select().from(users).where(eq(users.oidc_sub, sub)).limit(1);
   if (existing[0]) return existing[0];
 
-  // Email-merge path: an Auth.js magic-link user might match an existing
-  // row by email even if oidc_sub differs. Only applies when the new sub is
-  // Auth.js-shaped (has the prefix) AND the email is present + verified.
-  // We DON'T do this for Google subs — those are stable per-provider and
-  // a new Google sub for an existing email means a different Google account.
-  const isAuthjsEmailSub = sub.startsWith("email:");
-  if (isAuthjsEmailSub && claims.email) {
+  // Email-merge path: an Auth.js user might match an existing row by email
+  // even when the sub differs. Fires for any Auth.js-shaped sub (google: /
+  // apple: / email:) AND when the existing row's oidc_sub is NOT itself
+  // Auth.js-shaped (i.e. it's a legacy Authentik sub). This is the
+  // migration path — same human signs into the SAME email via Auth.js
+  // now, we update their canonical sub from the Authentik UUID to the
+  // provider-prefixed Auth.js form.
+  //
+  // Google + Apple both enforce 1:1 email-to-account, so an email
+  // collision IS the same human. For magic-link, email IS the identity.
+  //
+  // We deliberately DON'T cross-merge between Auth.js providers (e.g.
+  // signup via google:1234 then sign-in via email:same@addr). That would
+  // silently flip the canonical sub mid-session and break the original
+  // provider's future logins. Those collisions surface as 23505 →
+  // AccessDenied; a future "account linking" feature can resolve them.
+  const isAuthjsSub =
+    sub.startsWith("google:") || sub.startsWith("apple:") || sub.startsWith("email:");
+  if (isAuthjsSub && claims.email) {
     const byEmail = await db.select().from(users).where(eq(users.email, claims.email)).limit(1);
     if (byEmail[0]) {
-      const merged = await db
-        .update(users)
-        .set({ oidc_sub: sub, updated_at: new Date() })
-        .where(eq(users.id, byEmail[0].id))
-        .returning();
-      const row = merged[0];
-      if (row) return row;
-      // Race lost — re-read.
-      const reread = await db.select().from(users).where(eq(users.id, byEmail[0].id)).limit(1);
-      if (reread[0]) return reread[0];
+      const existingIsAuthjs =
+        byEmail[0].oidc_sub.startsWith("google:") ||
+        byEmail[0].oidc_sub.startsWith("apple:") ||
+        byEmail[0].oidc_sub.startsWith("email:");
+      if (!existingIsAuthjs) {
+        const merged = await db
+          .update(users)
+          .set({ oidc_sub: sub, updated_at: new Date() })
+          .where(eq(users.id, byEmail[0].id))
+          .returning();
+        const row = merged[0];
+        if (row) return row;
+        // Race lost — re-read.
+        const reread = await db.select().from(users).where(eq(users.id, byEmail[0].id)).limit(1);
+        if (reread[0]) return reread[0];
+      }
+      // Existing row is already Auth.js-shaped — refuse the merge. Fall
+      // through to the INSERT below which fails on the email UNIQUE
+      // constraint; caller surfaces AccessDenied.
     }
   }
 

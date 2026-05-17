@@ -76,6 +76,16 @@ export const bookingStatusEnum = pgEnum("booking_status", [
 ]);
 export type BookingStatus = (typeof bookingStatusEnum.enumValues)[number];
 
+// ─────────────────────── Stripe Connect enums (migration 0009)
+
+export const stripeAccountStatusEnum = pgEnum("stripe_account_status", [
+  "pending",
+  "restricted",
+  "active",
+  "rejected",
+]);
+export type StripeAccountStatus = (typeof stripeAccountStatusEnum.enumValues)[number];
+
 // ─────────────────────── Tables
 
 export const users = pgTable(
@@ -364,6 +374,52 @@ export const bookings = pgTable(
   ],
 );
 
+/**
+ * stripe_accounts — one row per provider. Lazy-created on the first booking
+ * request against their listing. Tracks the Stripe Express account's
+ * onboarding state mirror so the UI can decide which CTA to show
+ * ("Continue setup" vs "Open dashboard") without hitting Stripe on every read.
+ *
+ * The `account.updated` webhook keeps the mirror in sync.
+ */
+export const stripeAccounts = pgTable(
+  "stripe_accounts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    user_id: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    account_id: text("account_id").notNull(),
+    status: stripeAccountStatusEnum("status").notNull().default("pending"),
+    charges_enabled: boolean("charges_enabled").notNull().default(false),
+    payouts_enabled: boolean("payouts_enabled").notNull().default(false),
+    details_submitted: boolean("details_submitted").notNull().default(false),
+    country: text("country").notNull().default("CA"),
+    default_currency: text("default_currency").notNull().default("CAD"),
+    created_at: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updated_at: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("stripe_accounts_user_id_uq").on(t.user_id),
+    uniqueIndex("stripe_accounts_account_id_uq").on(t.account_id),
+    index("stripe_accounts_status_idx").on(t.status),
+  ],
+);
+
+/**
+ * stripe_events — webhook idempotency store. PK on the Stripe event id makes
+ * duplicate-delivery a SQL-layer no-op (the second INSERT fails on conflict;
+ * the handler short-circuits). We don't store the event body — the webhook
+ * handler re-reads the raw signed payload on each delivery.
+ */
+export const stripeEvents = pgTable("stripe_events", {
+  event_id: text("event_id").primaryKey(),
+  type: text("type").notNull(),
+  received_at: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
+  processed: boolean("processed").notNull().default(false),
+  error_detail: text("error_detail"),
+});
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Category = typeof categories.$inferSelect;
@@ -378,6 +434,10 @@ export type MessageRow = typeof messages.$inferSelect;
 export type NewMessageRow = typeof messages.$inferInsert;
 export type BookingRow = typeof bookings.$inferSelect;
 export type NewBookingRow = typeof bookings.$inferInsert;
+export type StripeAccountRow = typeof stripeAccounts.$inferSelect;
+export type NewStripeAccountRow = typeof stripeAccounts.$inferInsert;
+export type StripeEventRow = typeof stripeEvents.$inferSelect;
+export type NewStripeEventRow = typeof stripeEvents.$inferInsert;
 
 // Re-export sql for callers that want to reach for it from one place.
 export { sql };

@@ -92,6 +92,37 @@ const EnvSchema = z.object({
       const norm = (v ?? "").trim().toLowerCase();
       return norm === "1" || norm === "true" || norm === "yes" || norm === "on";
     }),
+
+  // FEATURE_STRIPE — gates the /v1/payouts/* + /v1/webhooks/stripe endpoints
+  // (404 when off) and the Stripe-side wiring inside the booking lifecycle
+  // (payment_intent on booking-create, capture on accept, refund on cancel,
+  // transfer on complete). When off, bookings still work but stay free.
+  // Schema (migration 0009) is additive and lives in prod from day one.
+  // Default off so an unset env defaults to safe legacy behavior.
+  FEATURE_STRIPE: z
+    .string()
+    .optional()
+    .transform((v): boolean => {
+      const norm = (v ?? "").trim().toLowerCase();
+      return norm === "1" || norm === "true" || norm === "yes" || norm === "on";
+    }),
+
+  // ─── Stripe Connect (PR 4) ───
+  // Test mode: keys start with sk_test_* / whsec_*. Production: sk_live_*.
+  // The Stripe SDK is initialized lazily — when these are absent, every
+  // /v1/payouts/* endpoint returns 503 and the booking flow stays Stripe-free.
+  // Mirrors the R2 env-gate pattern.
+  STRIPE_SECRET_KEY: z
+    .string()
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : undefined)),
+  STRIPE_WEBHOOK_SECRET: z
+    .string()
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : undefined)),
+  // Country for newly-provisioned Connect accounts. CAD merchant for the
+  // Toronto launch; future markets will provision separate accounts.
+  STRIPE_ACCOUNT_COUNTRY: z.string().length(2).default("CA"),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

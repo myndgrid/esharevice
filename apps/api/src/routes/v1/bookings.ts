@@ -5,6 +5,7 @@ import {
   getDb,
   bookings,
   exchangeItems,
+  stripeAccounts,
   type BookingRow,
   type ExchangeItemRow,
 } from "@esharevice/db";
@@ -12,6 +13,7 @@ import {
   Booking,
   BookingCancel,
   BookingCreate,
+  BookingCreateResponse,
   BookingDecline,
   BookingEmptyBody,
   BookingListQuery,
@@ -21,6 +23,13 @@ import { requireAuth } from "../../middleware/auth.js";
 import { idempotency } from "../../middleware/idempotency.js";
 import { decodeCursor, encodeCursor } from "../../lib/cursor.js";
 import { calculateTotals, quantityFromRange } from "../../lib/pricing.js";
+import {
+  cancelPaymentIntent,
+  capturePaymentIntent,
+  createBookingPaymentIntent,
+  refundPaymentIntent,
+  stripeConfigured,
+} from "../../lib/stripe.js";
 import { env } from "../../env.js";
 import type { AppEnv } from "../../app.js";
 
@@ -38,6 +47,7 @@ const ProblemSchema = z
 
 const BookingSchema = Booking.openapi("Booking");
 const BookingCreateSchema = BookingCreate.openapi("BookingCreate");
+const BookingCreateResponseSchema = BookingCreateResponse.openapi("BookingCreateResponse");
 const BookingDeclineSchema = BookingDecline.openapi("BookingDecline");
 const BookingCancelSchema = BookingCancel.openapi("BookingCancel");
 const BookingEmptyBodySchema = BookingEmptyBody.openapi("BookingEmptyBody");
@@ -142,7 +152,10 @@ route.openapi(
       "Renter creates a booking against a paid listing (rent / hire / sell). " +
       "Pricing snapshot computed server-side from current item price + " +
       "request quantity. SQL EXCLUDE constraint protects against overlapping " +
-      "rent/hire bookings on the same item — second concurrent request 409s.",
+      "rent/hire bookings on the same item — second concurrent request 409s. " +
+      "When Stripe is configured AND the provider's Connect account is active, " +
+      "the response includes a `client_secret` for Stripe Elements. Otherwise " +
+      "`client_secret` is null and the booking exists but has no payment leg.",
     security: [{ Bearer: [] }],
     middleware: [requireAuth, idempotency()] as const,
     request: {
@@ -150,11 +163,12 @@ route.openapi(
       body: { content: { "application/json": { schema: BookingCreateSchema } } },
     },
     responses: {
-      201: { description: "Created", content: { "application/json": { schema: BookingSchema } } },
-      400: { description: "Validation failed", content: problemContent },
+      201: { description: "Created", content: { "application/json": { schema: BookingCreateResponseSchema } } },
+      400: { description: "Validation failed / provider not Stripe-ready when Stripe required", content: problemContent },
       401: { description: "Unauthenticated", content: problemContent },
       404: { description: "Item not found / feature disabled", content: problemContent },
       409: { description: "Date range overlaps an existing booking, or renter is the item owner", content: problemContent },
+      502: { description: "Stripe call failed", content: problemContent },
     },
   }),
   async (c) => {
@@ -218,6 +232,10 @@ route.openapi(
     });
 
     const db = getDb();
+
+    // Insert FIRST — the EXCLUDE constraint catches double-bookings before
+    // any Stripe call. Critical ordering: SQL invariant before money moves.
+    let row: BookingRow;
     try {
       const inserted = await db
         .insert(bookings)
@@ -238,19 +256,82 @@ route.openapi(
           message_to_provider: body.message_to_provider ?? null,
         })
         .returning();
-      const row = inserted[0];
-      if (!row) throw new HTTPException(500, { message: "insert returned no rows" });
-      return c.json(toApiBooking(row), 201);
+      const ins = inserted[0];
+      if (!ins) throw new HTTPException(500, { message: "insert returned no rows" });
+      row = ins;
     } catch (err) {
-      // EXCLUDE constraint violation: another booking already holds part of
-      // the requested range on this item. Postgres code 23P01 = exclusion_violation.
-      if (err instanceof Error && /23P01|exclusion_violation|bookings_no_overlap/i.test(err.message)) {
+      const cause = (err as { cause?: { code?: string; constraint_name?: string } }).cause;
+      if (
+        cause?.code === "23P01" ||
+        cause?.constraint_name === "bookings_no_overlap" ||
+        (err instanceof Error && /23P01|exclusion_violation|bookings_no_overlap/i.test(err.message))
+      ) {
         throw new HTTPException(409, {
           message: "Those dates overlap an existing booking on this item. Try a different range.",
         });
       }
       throw err;
     }
+
+    // Stripe leg — only when configured AND the provider has an active
+    // Connect account. Otherwise the booking exists but is payment-free
+    // (free trade-paths reuse this for backward compat with PR 3).
+    let clientSecret: string | null = null;
+    if (stripeConfigured()) {
+      const acctRows = await db
+        .select()
+        .from(stripeAccounts)
+        .where(eq(stripeAccounts.user_id, item.user_id))
+        .limit(1);
+      const acct = acctRows[0];
+      if (!acct || acct.status !== "active") {
+        // Provider needs to finish Stripe onboarding before they can accept
+        // paid bookings. Roll back the booking row so the renter doesn't
+        // see a stuck 'requested' booking.
+        await db.delete(bookings).where(eq(bookings.id, row.id));
+        throw new HTTPException(400, {
+          message:
+            "This provider hasn't set up payouts yet. They'll need to finish Stripe onboarding before accepting bookings.",
+        });
+      }
+      let intent;
+      try {
+        intent = await createBookingPaymentIntent({
+          bookingId: row.id,
+          amountCents: row.total_cents,
+          applicationFeeCents: row.platform_fee_cents,
+          providerAccountId: acct.account_id,
+          customerEmail: u.email,
+          description: `Booking ${row.id.slice(0, 8)} — ${item.service}`,
+        });
+      } catch (err) {
+        // Stripe call failed — roll back the booking. The renter's card
+        // was never charged (PaymentIntent never created); state stays clean.
+        await db.delete(bookings).where(eq(bookings.id, row.id));
+        const msg = err instanceof Error ? err.message : "Stripe create failed";
+        throw new HTTPException(502, { message: `Stripe error: ${msg}` });
+      }
+      // Update booking with the intent id; surface client_secret for Elements.
+      const updated = await db
+        .update(bookings)
+        .set({
+          stripe_payment_intent_id: intent.id,
+          updated_at: new Date(),
+        })
+        .where(eq(bookings.id, row.id))
+        .returning();
+      const u2 = updated[0];
+      if (u2) row = u2;
+      clientSecret = intent.client_secret ?? null;
+    }
+
+    return c.json(
+      BookingCreateResponse.parse({
+        booking: toApiBooking(row),
+        client_secret: clientSecret,
+      }),
+      201,
+    );
   },
 );
 
@@ -396,6 +477,21 @@ route.openapi(
       status: "confirmed",
       confirmed_at: now,
     });
+
+    // Capture the authorized PaymentIntent. The transfer_data.destination
+    // on the intent means Stripe routes funds to the provider's Connect
+    // account at this point. Any Stripe-side failure leaves the booking
+    // in 'confirmed' state — the webhook handler reconciles when Stripe
+    // eventually catches up (or the operator retries via dashboard).
+    if (stripeConfigured() && updated.stripe_payment_intent_id) {
+      try {
+        await capturePaymentIntent(updated.stripe_payment_intent_id);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Stripe capture failed";
+        console.error(`[bookings.accept] capture failed for ${updated.id}:`, msg);
+        // Don't bubble — booking is confirmed, Stripe webhook will reconcile.
+      }
+    }
     return c.json(toApiBooking(updated), 200);
   },
 );
@@ -437,6 +533,19 @@ route.openapi(
       declined_at: now,
       decline_reason: body.reason,
     });
+
+    // Cancel the authorized PaymentIntent. capture_method='manual' means
+    // the auth hold is released without a refund appearing on the renter's
+    // statement (Stripe convention). Best-effort: if the cancel fails the
+    // webhook handler reconciles when payment_intent.canceled fires.
+    if (stripeConfigured() && updated.stripe_payment_intent_id) {
+      try {
+        await cancelPaymentIntent(updated.stripe_payment_intent_id);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Stripe cancel failed";
+        console.error(`[bookings.decline] cancel failed for ${updated.id}:`, msg);
+      }
+    }
     return c.json(toApiBooking(updated), 200);
   },
 );
@@ -529,6 +638,7 @@ route.openapi(
     // Use a guarded UPDATE so two concurrent cancels can't both succeed.
     const db = getDb();
     const now = new Date();
+    const priorStatus = row.status;
     const updated = await db
       .update(bookings)
       .set({
@@ -551,6 +661,28 @@ route.openapi(
         message: "Booking state changed before the cancel landed — try again.",
       });
     }
+
+    // Stripe refund/void path. Depends on the booking's prior status:
+    //   • 'requested'  — auth hold, not captured → cancel the intent (no refund visible)
+    //   • 'confirmed'  — already captured → full refund + reverse_transfer
+    if (stripeConfigured() && u2.stripe_payment_intent_id) {
+      try {
+        if (priorStatus === "requested") {
+          await cancelPaymentIntent(u2.stripe_payment_intent_id);
+        } else {
+          await refundPaymentIntent({
+            intentId: u2.stripe_payment_intent_id,
+            reason: "requested_by_customer",
+          });
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Stripe refund/cancel failed";
+        console.error(`[bookings.cancel] Stripe call failed for ${u2.id}:`, msg);
+        // Booking is in 'cancelled' state already; the operator can retry
+        // the refund via Stripe dashboard if this transient failure persists.
+      }
+    }
+
     return c.json(toApiBooking(u2), 200);
   },
 );

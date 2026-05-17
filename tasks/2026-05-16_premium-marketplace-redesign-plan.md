@@ -1,8 +1,8 @@
 # Task: e-Sharevice Systems Overhaul — Multi-Type Marketplace with Payments
 
 **Created:** 2026-05-16 22:30 UTC
-**Last Updated:** 2026-05-17 05:30 UTC
-**Status:** In Progress — PRs 1a + 2 + 3 shipped; PR 1b, PRs 4–12 ahead
+**Last Updated:** 2026-05-17 06:10 UTC
+**Status:** In Progress — PRs 1a + 2 + 3 + 4 shipped; PR 1b open; PRs 5–12 ahead
 
 ## Objective
 
@@ -906,7 +906,7 @@ PR-by-PR shipping status. Each PR links to its task log for the implementation d
 | **PR 1b** | Auth.js wire-up: install `next-auth@beta`, `apps/web/auth.ts`, JWKS endpoint at `/.well-known/jwks.json`, branded `/login`, replace `apps/web/middleware.ts`, dual-issuer JWKS verifier in API, `/v1/me/provision`, Authentik teardown after 7-day overlap, `lighthouse-auth.cjs` rewrite, `docs/features/2026-05-17_authjs-migration.md` runbook | Pending | — | — |
 | **PR 2** | Schema 0007 listing taxonomy + extended `/v1/exchange-items` API (type-discriminated body, new query params, deprecate `reserve`) | **Shipped 2026-05-17** | [2026-05-17_pr2-listing-taxonomy.md](2026-05-17_pr2-listing-taxonomy.md) | [#2](https://github.com/myndgrid/esharevice/pull/2) |
 | **PR 3** | Schema 0008 bookings (with `EXCLUDE USING gist` no-overlap constraint) + bookings API + pricing helpers + activate/complete cron jobs (no-op until flag flip) | **Shipped 2026-05-17** | [2026-05-17_pr3-bookings.md](2026-05-17_pr3-bookings.md) | — |
-| **PR 4** | Schema 0009 Stripe Connect + `payouts.ts` + webhook receiver + Stripe SDK (CAD default, GST/HST via Stripe Tax) | Pending | — | — |
+| **PR 4** | Schema 0009 Stripe Connect + `payouts.ts` + webhook receiver + Stripe SDK (CAD default, GST/HST via Stripe Tax) | **Shipped 2026-05-17** | [2026-05-17_pr4-stripe-connect.md](2026-05-17_pr4-stripe-connect.md) | (GitHub PR follow) |
 | **PR 5** | Marketplace UI primitives: `<Heart>`, `<RatingStar>`, `<SearchPill>`, `<CategoryStrip>`, `<ListingTypeChips>`, `<TypeBadge>`, `<BecomeBand>`, `<LiveCard>`, `<HoodTile>`, `<MobileTabBar>`, `<MobileSearchPill>`, `<ActionPanel>` + 5 renderers, `<DateRangePicker>`, `<DurationPicker>`, `<PriceBreakdown>`, `<StatusPill>`, `<StatusTimeline>`, `<TrustSignalsRow>`, `<TypeWizardCard>` + components page at `docs/mockups/_components.html` | Pending | — | — |
 | **PR 6** | Landing redesign — `apps/web/app/page.tsx` body becomes marketplace landing with type filter chips | Pending | — | — |
 | **PR 7** | Item detail with polymorphic action panel — all 5 listing types render | Pending | — | — |

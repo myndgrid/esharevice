@@ -1,7 +1,11 @@
 /* Tailwind v4 — `@theme` consumes our oklch tokens so utilities like
- * `bg-bg`, `text-fg`, `border-border`, `bg-accent` map to the CSS variables
- * defined in @esharevice/ui/styles.css. Both light and dark themes flip
- * automatically because the variables are scoped to :root / [data-theme="dark"].
+ * `bg-bg`, `text-fg`, `border-border`, `bg-brand`, `bg-accent-soft` map to
+ * the CSS variables defined in @esharevice/ui/styles.css. Both light and
+ * dark themes flip automatically because the variables are scoped to
+ * :root / [data-theme="dark"].
+ *
+ * Brand = sky-500 (primary). Accent = amber-500 (secondary).
+ * See packages/ui/src/styles.css for the full rationale + AA contrast notes.
  */
 @import "@esharevice/ui/styles.css";
 @import "tailwindcss";
@@ -10,15 +14,25 @@
   --color-bg: var(--bg);
   --color-bg-elevated: var(--bg-elevated);
   --color-bg-subtle: var(--bg-subtle);
+  --color-bg-soft: var(--bg-soft);
   --color-fg: var(--fg);
   --color-fg-muted: var(--fg-muted);
   --color-fg-subtle: var(--fg-subtle);
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
+  --color-brand: var(--brand);
+  --color-brand-h: var(--brand-h);
+  --color-brand-p: var(--brand-p);
+  --color-brand-deep: var(--brand-deep);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-fg: var(--brand-fg);
   --color-accent: var(--accent);
+  --color-accent-h: var(--accent-h);
+  --color-accent-soft: var(--accent-soft);
   --color-accent-fg: var(--accent-fg);
   --color-danger: var(--danger);
   --color-success: var(--success);
+  --color-warning: var(--warning);
   --color-ring: var(--ring);
   --radius-sm: var(--radius-sm);
   --radius-md: var(--radius-md);

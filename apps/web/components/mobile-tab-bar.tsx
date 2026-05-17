@@ -51,7 +51,7 @@ export function MobileTabBar({
                 className={
                   "flex h-14 min-w-12 flex-col items-center justify-center gap-0.5 text-xs " +
                   "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg " +
-                  (active ? "text-accent" : "text-fg-muted hover:text-fg")
+                  (active ? "text-brand" : "text-fg-muted hover:text-fg")
                 }
               >
                 <span aria-hidden className="relative grid place-items-center">

@@ -183,7 +183,7 @@ export function ConversationView({
                   className={
                     "max-w-[80%] rounded-2xl px-3 py-2 text-sm " +
                     (m.sender_id === meId
-                      ? "bg-accent text-accent-fg"
+                      ? "bg-brand text-brand-fg"
                       : "bg-bg-subtle text-fg")
                   }
                 >
@@ -191,7 +191,7 @@ export function ConversationView({
                   <p
                     className={
                       "mt-1 text-[10px] " +
-                      (m.sender_id === meId ? "text-accent-fg/75" : "text-fg-subtle")
+                      (m.sender_id === meId ? "text-brand-fg/75" : "text-fg-subtle")
                     }
                   >
                     {formatTime(m.created_at)}
@@ -227,7 +227,7 @@ export function ConversationView({
             rows={1}
             placeholder="Type a message…"
             maxLength={MAX_BODY}
-            className="min-h-10 max-h-32 flex-1 resize-y rounded-md border border-border bg-bg-subtle px-3 py-2 text-sm text-fg placeholder:text-fg-subtle outline-none focus:border-accent focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-bg"
+            className="min-h-10 max-h-32 flex-1 resize-y rounded-md border border-border bg-bg-subtle px-3 py-2 text-sm text-fg placeholder:text-fg-subtle outline-none focus:border-brand focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-bg"
           />
           {/*
             Keep the "Send" text stable across pending/idle so screen
@@ -236,7 +236,7 @@ export function ConversationView({
           */}
           <Button
             type="submit"
-            variant="primary"
+            variant="brand"
             size="sm"
             disabled={sending || body.trim().length === 0}
             aria-busy={sending}

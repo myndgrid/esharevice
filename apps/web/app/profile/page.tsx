@@ -40,7 +40,7 @@ export default async function ProfilePage(): Promise<React.ReactElement> {
 
           <div className="flex gap-2">
             <Link href="/">
-              <Button variant="secondary" size="sm">Back to home</Button>
+              <Button variant="ghost" size="sm">Back to home</Button>
             </Link>
             <form action="/api/auth/logout" method="post">
               <Button type="submit" variant="ghost" size="sm">Sign out</Button>

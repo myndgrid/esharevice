@@ -45,7 +45,7 @@ export function SaveButton({
       <Button
         type="button"
         onClick={onClick}
-        variant={saved ? "secondary" : "ghost"}
+        variant="ghost"
         size="sm"
         disabled={pending}
         aria-pressed={saved}

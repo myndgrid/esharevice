@@ -58,7 +58,7 @@ export default async function UnsubscribePage({
             <p className="text-sm text-fg-muted">
               You won&apos;t receive any more {label} from e-Sharevice. You can
               re-enable them anytime from{" "}
-              <a className="text-accent underline" href="/settings/notifications">
+              <a className="text-brand underline" href="/settings/notifications">
                 your notification settings
               </a>
               .
@@ -91,7 +91,7 @@ export default async function UnsubscribePage({
           <form action={unsubscribeAction}>
             <input type="hidden" name="token" value={token} />
             <input type="hidden" name="category" value={category} />
-            <Button type="submit" variant="primary" size="md">
+            <Button type="submit" variant="brand" size="md">
               Confirm unsubscribe
             </Button>
           </form>

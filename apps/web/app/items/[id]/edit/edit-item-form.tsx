@@ -100,7 +100,7 @@ export function EditItemForm({ item }: { item: ExchangeItem }): React.ReactEleme
         >
           Cancel
         </a>
-        <Button type="submit" variant="primary" size="md" disabled={pending}>
+        <Button type="submit" variant="brand" size="md" disabled={pending}>
           {pending ? "Saving…" : "Save changes"}
         </Button>
       </div>
@@ -109,7 +109,7 @@ export function EditItemForm({ item }: { item: ExchangeItem }): React.ReactEleme
 }
 
 const inputCls =
-  "w-full rounded-md border border-border bg-bg-subtle px-3 py-2 text-sm text-fg placeholder:text-fg-subtle outline-none focus:border-accent focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-bg";
+  "w-full rounded-md border border-border bg-bg-subtle px-3 py-2 text-sm text-fg placeholder:text-fg-subtle outline-none focus:border-brand focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-bg";
 
 function Field({
   name,

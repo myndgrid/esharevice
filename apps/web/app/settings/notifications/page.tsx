@@ -105,7 +105,7 @@ function PrefRow({
                 className={
                   "inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg " +
                   (enabled
-                    ? "border-accent bg-accent text-accent-fg hover:bg-accent/90"
+                    ? "border-brand bg-brand text-brand-fg hover:bg-brand-h"
                     : "border-border bg-bg-subtle text-fg hover:bg-bg-subtle/80")
                 }
               >

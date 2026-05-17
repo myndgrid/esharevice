@@ -41,8 +41,8 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "oklch(99% 0 0)" },
-    { media: "(prefers-color-scheme: dark)", color: "oklch(15% 0.015 260)" },
+    { media: "(prefers-color-scheme: light)", color: "oklch(100% 0 0)" },
+    { media: "(prefers-color-scheme: dark)", color: "oklch(15% 0 0)" },
   ],
 };
 
@@ -88,7 +88,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         */}
         <a
           href="#main-content"
-          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:border focus:border-accent focus:bg-bg focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-accent focus:shadow-lg"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:border focus:border-brand focus:bg-bg focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-brand-deep focus:shadow-lg"
         >
           Skip to content
         </a>

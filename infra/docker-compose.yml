@@ -105,6 +105,13 @@ services:
       WEB_PORT: 3000
       NEXT_PUBLIC_API_URL: https://api.${DOMAIN:?required}
       # ─── Auth.js (apps/web) ───
+      # AUTH_URL is Auth.js's authoritative public origin — without it, v5
+      # derives callbackUrl/signinUrl from the listening socket (0.0.0.0:3000
+      # inside the container) and produces broken redirects like
+      # `https://0.0.0.0:3000/api/authjs/callback/google`. `trustHost: true`
+      # in auth.ts handles request-host derivation for cookies + CSRF, but
+      # link-building still consults AUTH_URL first.
+      AUTH_URL: https://${DOMAIN}
       AUTH_ISSUER: https://${DOMAIN}
       AUTH_AUDIENCE: esharevice-api
       AUTH_SECRET: ${AUTH_SECRET:?required}

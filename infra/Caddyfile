@@ -1,8 +1,11 @@
 # Caddy 2 — auto-TLS via Let's Encrypt, HTTP/3 by default.
-# Three public hosts in front of the Compose stack:
+# Two public hosts in front of the Compose stack:
 #   {$DOMAIN}        -> web   (Next.js)         ← app lives at the root domain
 #   api.{$DOMAIN}    -> api   (Hono :8080)
-#   auth.{$DOMAIN}   -> authentik-server :9000 (HTTP) / :9443 (HTTPS)
+#
+# Auth lives inside the web app (Auth.js) at /api/authjs/* — no separate
+# subdomain after Phase 3 of the Authentik teardown. The auth.{$DOMAIN}
+# DNS record can be deleted from Cloudflare.
 #
 # www.{$DOMAIN} and app.{$DOMAIN} permanently 301 to the root domain so old
 # bookmarks keep working. The app.* hostname is kept provisioned (Let's
@@ -86,26 +89,6 @@ api.{$DOMAIN} {
 		reverse_proxy api:8080 {
 			header_up X-Real-IP {remote_host}
 		}
-	}
-}
-
-# ─────────────────────────────────────────── Authentik (identity provider)
-auth.{$DOMAIN} {
-	encode zstd gzip
-
-	header {
-		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
-		X-Content-Type-Options    "nosniff"
-		X-Frame-Options           "DENY"
-		Referrer-Policy           "no-referrer"
-		-Server
-	}
-
-	# Authentik listens on 9000 (HTTP) and 9443 (HTTPS). Use HTTP between Caddy and Authentik
-	# inside the docker network — TLS terminates at Caddy.
-	reverse_proxy authentik-server:9000 {
-		header_up X-Real-IP {remote_host}
-		header_up Host {host}
 	}
 }
 

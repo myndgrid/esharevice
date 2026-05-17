@@ -83,7 +83,7 @@ app.openAPIRegistry.registerComponent("securitySchemes", "Bearer", {
   type: "http",
   scheme: "bearer",
   bearerFormat: "JWT",
-  description: "Authentik-issued JWT access token.",
+  description: "Auth.js-issued RS256 JWT access token (verified via the JWKS endpoint).",
 });
 app.get("/v1/docs", swaggerUI({ url: "/v1/openapi.json" }));
 

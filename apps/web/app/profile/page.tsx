@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Avatar, Button, Card, CardContent } from "@esharevice/ui";
 import { requireAuth } from "../../lib/auth";
 import { api, ApiError } from "../../lib/api";
+import { signOutAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +43,7 @@ export default async function ProfilePage(): Promise<React.ReactElement> {
             <Link href="/">
               <Button variant="ghost" size="sm">Back to home</Button>
             </Link>
-            <form action="/api/auth/logout" method="post">
+            <form action={signOutAction}>
               <Button type="submit" variant="ghost" size="sm">Sign out</Button>
             </form>
           </div>

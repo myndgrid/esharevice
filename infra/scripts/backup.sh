@@ -11,7 +11,6 @@
 #
 # Env (read from /etc/esharevice-backup.env, root-only readable):
 #   POSTGRES_PASSWORD                 (app DB)
-#   AUTHENTIK_POSTGRES_PASSWORD       (Authentik DB)
 #   AGE_RECIPIENT                     (public age key; private key lives in 1Password)
 #   B2_BUCKET                         (e.g. esharevice-backups)
 #   RETENTION_DAYS                    (default 30)
@@ -34,7 +33,6 @@ fi
 . "$ENV_FILE"
 
 : "${POSTGRES_PASSWORD:?required}"
-: "${AUTHENTIK_POSTGRES_PASSWORD:?required}"
 : "${AGE_RECIPIENT:?required}"
 : "${B2_BUCKET:?required}"
 RETENTION_DAYS=${RETENTION_DAYS:-30}
@@ -53,15 +51,8 @@ docker exec -e PGPASSWORD="$POSTGRES_PASSWORD" -i esharevice-postgres-1 \
   pg_dump -U esharevice -d esharevice --no-owner --no-acl --format=plain --compress=0 \
   | gzip -9 > "$APP_FILE"
 
-# ── dump Authentik DB ──────────────────────────────────────
-AUTH_FILE="$WORKDIR/esharevice-authentik-$STAMP.sql.gz"
-log "dumping authentik DB → $AUTH_FILE"
-docker exec -e PGPASSWORD="$AUTHENTIK_POSTGRES_PASSWORD" -i esharevice-authentik-postgres-1 \
-  pg_dump -U authentik -d authentik --no-owner --no-acl --format=plain --compress=0 \
-  | gzip -9 > "$AUTH_FILE"
-
 # ── encrypt at rest with age ───────────────────────────────
-for f in "$APP_FILE" "$AUTH_FILE"; do
+for f in "$APP_FILE"; do
   log "encrypting $f"
   age -r "$AGE_RECIPIENT" -o "$f.age" "$f"
   rm -f "$f"

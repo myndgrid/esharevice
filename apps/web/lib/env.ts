@@ -1,15 +1,17 @@
 import { z } from "zod";
 
+/**
+ * apps/web env schema. Post-Phase-3 of the Authentik teardown, the only
+ * runtime value this app needs from env (outside the Auth.js stack, which
+ * reads its own AUTH_* vars directly) is the API base URL.
+ *
+ * Auth.js manages its own env reads inside apps/web/auth.ts — those vars
+ * (AUTH_SECRET, AUTH_JWT_PRIVATE_KEY, AUTH_GOOGLE_*, etc.) intentionally
+ * don't go through this module.
+ */
 const EnvSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   NEXT_PUBLIC_API_URL: z.string().url().default("http://localhost:8080"),
-  OIDC_ISSUER: z.string().url(),
-  OIDC_CLIENT_ID: z.string().min(1),
-  OIDC_CLIENT_SECRET: z.string().min(1),
-  OIDC_REDIRECT_URI: z.string().url(),
-  SESSION_COOKIE_SECRET: z
-    .string()
-    .min(32, "SESSION_COOKIE_SECRET must be at least 32 chars (use `openssl rand -hex 32`)"),
 });
 
 export type Env = z.infer<typeof EnvSchema>;
@@ -17,37 +19,15 @@ export type Env = z.infer<typeof EnvSchema>;
 let cached: Env | null = null;
 
 /**
- * Lazy env accessor — parses on first call, throws if required vars are missing.
- *
- * Why lazy: Next.js's `next build` step statically evaluates module-level code
- * in API route handlers (during "Collecting page data"). A top-level `const env
- * = parse(...)` would run at build time when OIDC_* vars aren't set in the
- * Docker build environment. Lazy evaluation defers the parse until the first
- * runtime request, when the env IS populated by Docker Compose.
+ * Lazy env accessor — parses on first call. Lazy because `next build`
+ * statically evaluates module-level code; deferring the parse keeps the
+ * build step env-independent.
  */
 export function getEnv(): Env {
   if (cached) return cached;
   cached = EnvSchema.parse({
     NODE_ENV: process.env.NODE_ENV,
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
-    OIDC_ISSUER: process.env.OIDC_ISSUER,
-    OIDC_CLIENT_ID: process.env.OIDC_CLIENT_ID,
-    OIDC_CLIENT_SECRET: process.env.OIDC_CLIENT_SECRET,
-    OIDC_REDIRECT_URI: process.env.OIDC_REDIRECT_URI,
-    SESSION_COOKIE_SECRET: process.env.SESSION_COOKIE_SECRET,
   });
   return cached;
-}
-
-/**
- * Public-facing origin (scheme://host) the browser uses to reach this app.
- *
- * Why this instead of `req.nextUrl.origin`: Next sits behind Caddy in prod, and
- * Caddy doesn't forward X-Forwarded-Host by default. The upstream sees the
- * internal Docker hostname (`web:3000`), so `req.nextUrl.origin` becomes
- * `http://web:3000` — the browser can't reach that. OIDC_REDIRECT_URI has the
- * real public URL and Authentik validates it, so we trust it as canonical.
- */
-export function getPublicOrigin(): string {
-  return new URL(getEnv().OIDC_REDIRECT_URI).origin;
 }

@@ -1,55 +1,28 @@
 import { redirect } from "next/navigation";
 import { auth as authjs } from "../auth";
-import { readAccessToken, readSession } from "./session";
 
 /**
  * Authenticated state returned to server components.
  *
- * Phase 2 of the Authentik → Auth.js migration. This wrapper now prefers
- * the Auth.js session (set by next-auth via the `esharevice_authjs_session`
- * cookie). When that's absent, it falls back to the legacy Authentik
- * session/access cookies that PR 1a's middleware refreshes. Both code
- * paths return the same shape so consumers don't need to know which auth
- * stack a given user came in through.
- *
- * After Phase 3 (Authentik teardown), only the Auth.js branch remains.
+ * Phase 3 complete — Auth.js is now the only auth provider. The wrapper
+ * pulls the session from Auth.js's cookie + the access_token from the
+ * `jwt` callback's mint (see apps/web/auth.ts).
  */
 export type AuthenticatedSession = {
   sub: string;
   access_token: string;
-  id_token?: string;
 };
 
 /**
- * Server-side auth helper. Pure read — does no refresh.
+ * Server-side auth helper. Pure read — does no refresh. Auth.js handles
+ * cookie + access-token lifecycle internally; we just unwrap.
  */
 export async function auth(): Promise<AuthenticatedSession | null> {
-  // Auth.js path (preferred). NextAuth.auth() resolves the session from the
-  // esharevice_authjs_session cookie; the jwt callback in apps/web/auth.ts
-  // mints a fresh RS256 access_token on every touch and stashes it on the
-  // session via `session.accessToken`.
-  const ajs = await authjs().catch(() => null);
-  if (ajs?.user?.id) {
-    const accessToken = (ajs as { accessToken?: string }).accessToken;
-    if (accessToken) {
-      return { sub: ajs.user.id, access_token: accessToken };
-    }
-    // Session exists but the access_token didn't get minted — happens on the
-    // brief window after sign-in before the jwt callback runs. Fall through
-    // to Authentik (won't match either, returns null = anonymous) so the
-    // user gets bounced through /login again rather than rendering broken.
-  }
-
-  // Authentik fallback. Same logic as pre-cutover: the middleware refreshes
-  // the access_token cookie proactively, so server components see a valid
-  // value unless the refresh failed (in which case the cookies are cleared
-  // and we return null).
-  const session = await readSession();
-  if (!session) return null;
-  const access_token = (await readAccessToken()) ?? "";
-  const out: AuthenticatedSession = { sub: session.sub, access_token };
-  if (session.id_token) out.id_token = session.id_token;
-  return out;
+  const session = await authjs().catch(() => null);
+  if (!session?.user?.id) return null;
+  const accessToken = (session as { accessToken?: string }).accessToken;
+  if (!accessToken) return null;
+  return { sub: session.user.id, access_token: accessToken };
 }
 
 /**

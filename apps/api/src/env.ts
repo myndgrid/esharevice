@@ -7,31 +7,17 @@ const EnvSchema = z.object({
   WEB_ORIGIN: z.string().default("http://localhost:3000"),
   DATABASE_URL: z.string().min(1),
   REDIS_URL: z.string().min(1).default("redis://localhost:6379"),
-  // OIDC — Authentik is the legacy issuer. The API never signs or stores secrets
-  // for tokens. During the Authentik → Auth.js migration window (PR 1b), the API
-  // verifies BOTH issuers via iss-routed JWKS resolution; see auth.ts middleware.
+  // OIDC verifier — Auth.js is the issuer post Phase 3 teardown.
+  // The API never signs tokens; it only verifies against the public JWKS
+  // served by `apps/web/.well-known/jwks.json`. Var names kept under the
+  // generic OIDC_* convention (not AUTHJS_*) so a future IdP swap is a
+  // single-line env change.
+  //   OIDC_ISSUER   = web origin (e.g. http://localhost:3000)
+  //   OIDC_AUDIENCE = "esharevice-api" (matches AUTH_AUDIENCE on the web side)
+  //   OIDC_JWKS_URL = ${web_origin}/.well-known/jwks.json
   OIDC_ISSUER: z.string().url(),
   OIDC_AUDIENCE: z.string().min(1),
   OIDC_JWKS_URL: z.string().url(),
-
-  // Auth.js issuer (apps/web). Optional — when absent, the API only accepts
-  // Authentik tokens (legacy-only mode for envs that haven't switched yet).
-  // When set, the API also trusts JWTs whose iss claim matches AUTHJS_ISSUER,
-  // verifying against AUTHJS_JWKS_URL (typically `${web_origin}/.well-known/jwks.json`).
-  AUTHJS_ISSUER: z
-    .string()
-    .url()
-    .optional()
-    .transform((v) => (v && v.length > 0 ? v : undefined)),
-  AUTHJS_JWKS_URL: z
-    .string()
-    .url()
-    .optional()
-    .transform((v) => (v && v.length > 0 ? v : undefined)),
-  AUTHJS_AUDIENCE: z
-    .string()
-    .optional()
-    .transform((v) => (v && v.length > 0 ? v : undefined)),
   // Cloudflare R2 — optional at boot so dev/test can run without uploads wired.
   // If any of {account_id, access_key, secret, bucket} are absent the upload
   // endpoint returns 503; everything else still works.

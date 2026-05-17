@@ -5,16 +5,12 @@
 name: esharevice
 
 networks:
-  edge:        # Caddy ↔ web/api/authentik
+  edge:        # Caddy ↔ web/api
   internal:    # services ↔ datastores (no internet)
 
 volumes:
   postgres_data:
-  authentik_postgres_data:
   redis_data:
-  authentik_media:
-  authentik_certs:
-  authentik_templates:
   caddy_data:
   caddy_config:
   uptime_kuma_data:
@@ -51,92 +47,6 @@ services:
       retries: 5
     networks: [internal]
 
-  # ─────────────────────────────────────────── Authentik (its own DB)
-  authentik-postgres:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: authentik
-      POSTGRES_USER: authentik
-      POSTGRES_PASSWORD: ${AUTHENTIK_POSTGRES_PASSWORD:?required}
-    volumes:
-      - authentik_postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U authentik -d authentik"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-    networks: [internal]
-
-  authentik-server:
-    image: ghcr.io/goauthentik/server:2024.12
-    restart: unless-stopped
-    command: server
-    environment:
-      AUTHENTIK_REDIS__HOST: redis
-      AUTHENTIK_POSTGRESQL__HOST: authentik-postgres
-      AUTHENTIK_POSTGRESQL__USER: authentik
-      AUTHENTIK_POSTGRESQL__NAME: authentik
-      AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_POSTGRES_PASSWORD:?required}
-      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:?required}
-      AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
-      # Email (optional — wire when Resend/SMTP is provisioned)
-      AUTHENTIK_EMAIL__HOST: ${AUTHENTIK_EMAIL_HOST:-}
-      AUTHENTIK_EMAIL__PORT: ${AUTHENTIK_EMAIL_PORT:-587}
-      AUTHENTIK_EMAIL__USERNAME: ${AUTHENTIK_EMAIL_USERNAME:-}
-      AUTHENTIK_EMAIL__PASSWORD: ${AUTHENTIK_EMAIL_PASSWORD:-}
-      AUTHENTIK_EMAIL__USE_TLS: "true"
-      AUTHENTIK_EMAIL__FROM: ${AUTHENTIK_EMAIL_FROM:-noreply@${DOMAIN:?required}}
-      # Social OAuth — optional. Empty defaults make the blueprint template
-      # safe to drop in even before the user creates the upstream OAuth apps.
-      # Authentik's `!Env` blueprint tag reads these at apply time.
-      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
-      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
-      GITHUB_OAUTH_CLIENT_ID: ${GITHUB_OAUTH_CLIENT_ID:-}
-      GITHUB_OAUTH_CLIENT_SECRET: ${GITHUB_OAUTH_CLIENT_SECRET:-}
-    volumes:
-      - authentik_media:/media
-      - authentik_certs:/certs
-      - authentik_templates:/templates
-      - ./authentik/blueprints:/blueprints/custom:ro
-    depends_on:
-      authentik-postgres: { condition: service_healthy }
-      redis: { condition: service_healthy }
-    healthcheck:
-      test: ["CMD", "ak", "healthcheck"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
-    networks: [internal, edge]
-
-  authentik-worker:
-    image: ghcr.io/goauthentik/server:2024.12
-    restart: unless-stopped
-    command: worker
-    environment:
-      AUTHENTIK_REDIS__HOST: redis
-      AUTHENTIK_POSTGRESQL__HOST: authentik-postgres
-      AUTHENTIK_POSTGRESQL__USER: authentik
-      AUTHENTIK_POSTGRESQL__NAME: authentik
-      AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_POSTGRES_PASSWORD:?required}
-      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:?required}
-      # The worker is what applies blueprints; threading the OAuth env into
-      # this service too lets `!Env` resolve when social.yaml is enabled.
-      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
-      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
-      GITHUB_OAUTH_CLIENT_ID: ${GITHUB_OAUTH_CLIENT_ID:-}
-      GITHUB_OAUTH_CLIENT_SECRET: ${GITHUB_OAUTH_CLIENT_SECRET:-}
-    volumes:
-      - authentik_media:/media
-      - authentik_certs:/certs
-      - authentik_templates:/templates
-      - ./authentik/blueprints:/blueprints/custom:ro
-    depends_on:
-      authentik-postgres: { condition: service_healthy }
-      redis: { condition: service_healthy }
-    networks: [internal]
-
   # ─────────────────────────────────────────── App services
   api:
     image: ghcr.io/${GHCR_OWNER:?required}/esharevice-api:${API_IMAGE_TAG:-latest}
@@ -148,9 +58,9 @@ services:
       WEB_ORIGIN: https://${DOMAIN}
       DATABASE_URL: postgresql://${POSTGRES_USER:-esharevice}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-esharevice}
       REDIS_URL: redis://redis:6379
-      OIDC_ISSUER: https://auth.${DOMAIN}/application/o/e-sharevice-web/
-      OIDC_AUDIENCE: e-sharevice-web
-      OIDC_JWKS_URL: https://auth.${DOMAIN}/application/o/e-sharevice-web/jwks/
+      OIDC_ISSUER: https://${DOMAIN}
+      OIDC_AUDIENCE: esharevice-api
+      OIDC_JWKS_URL: https://${DOMAIN}/.well-known/jwks.json
       # Cloudflare R2 — optional; all five must be set together for image uploads to work.
       # Until you create the S3-compatible R2 token in the dashboard, leave these
       # blank; POST /v1/exchange-items/:id/image returns 503 until they're filled in.
@@ -184,11 +94,19 @@ services:
       NODE_ENV: production
       WEB_PORT: 3000
       NEXT_PUBLIC_API_URL: https://api.${DOMAIN:?required}
-      OIDC_ISSUER: https://auth.${DOMAIN}/application/o/e-sharevice-web/
-      OIDC_CLIENT_ID: e-sharevice-web
-      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:?required}
-      OIDC_REDIRECT_URI: https://${DOMAIN}/api/auth/callback
-      SESSION_COOKIE_SECRET: ${SESSION_COOKIE_SECRET:?required}
+      # ─── Auth.js (apps/web) ───
+      AUTH_ISSUER: https://${DOMAIN}
+      AUTH_AUDIENCE: esharevice-api
+      AUTH_SECRET: ${AUTH_SECRET:?required}
+      AUTH_JWT_PRIVATE_KEY: ${AUTH_JWT_PRIVATE_KEY:?required}
+      AUTH_GOOGLE_ID: ${AUTH_GOOGLE_ID:-}
+      AUTH_GOOGLE_SECRET: ${AUTH_GOOGLE_SECRET:-}
+      AUTH_APPLE_ID: ${AUTH_APPLE_ID:-}
+      AUTH_APPLE_TEAM_ID: ${AUTH_APPLE_TEAM_ID:-}
+      AUTH_APPLE_KEY_ID: ${AUTH_APPLE_KEY_ID:-}
+      AUTH_APPLE_PRIVATE_KEY: ${AUTH_APPLE_PRIVATE_KEY:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      AUTH_RESEND_FROM: ${AUTH_RESEND_FROM:-auth@${DOMAIN}}
       SENTRY_DSN: ${SENTRY_DSN_WEB:-}
     depends_on:
       api: { condition: service_healthy }
@@ -213,7 +131,6 @@ services:
     depends_on:
       - web
       - api
-      - authentik-server
     networks: [edge]
 
   # ─────────────────────────────────────────── Monitoring

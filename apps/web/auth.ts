@@ -1,16 +1,13 @@
 /**
- * Auth.js v5 (NextAuth beta) configuration.
- *
- * Lives during the migration window alongside the existing Authentik
- * OIDC flow (apps/web/app/api/auth/* — UNCHANGED in PR 1b). Auth.js
- * mounts under `/api/authjs/*` and uses a distinct cookie name so the
- * two systems can coexist for the 7-day overlap before Authentik gets
- * torn down.
+ * Auth.js v5 (NextAuth beta) configuration. Sole identity provider for the
+ * app post Phase 3 of the Authentik teardown.
  *
  * Key design:
- *   • basePath "/api/authjs" — separate URL space from Authentik.
- *   • Cookie "esharevice_authjs_session" — disambiguates from Authentik's
- *     "esharevice_session" so middleware can route by which one's present.
+ *   • basePath "/api/authjs" — kept distinct from the (now-deleted) legacy
+ *     `/api/auth/*` URL space. The basePath name stays so future commit
+ *     logs and route comments make sense.
+ *   • Cookie "esharevice_authjs_session" — custom name kept for the same
+ *     historical-clarity reason.
  *   • Session strategy "jwt" with a custom RS256 access_token minted in
  *     the jwt callback. The session cookie itself is the standard JWE
  *     (symmetric, AUTH_SECRET-encrypted). The access_token is what the

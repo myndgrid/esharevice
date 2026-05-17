@@ -48,7 +48,16 @@ function buildProviders() {
       }),
     );
   }
-  if (process.env["RESEND_API_KEY"]) {
+  // Resend (magic-link) is gated on AUTH_RESEND_ENABLED. Auth.js's email
+  // providers REQUIRE a database adapter to store the verification token
+  // between the "request email" POST and the user clicking the link. We
+  // don't ship an adapter yet — `@auth/drizzle-adapter` is a 2026-05 follow-up.
+  // Adding Resend without an adapter throws "MissingAdapter" on every
+  // /api/authjs/providers call, which surfaces to the UI as "There was a
+  // problem with the server configuration." So: keep RESEND_API_KEY for
+  // the API's transactional sends (booking notifications, etc.) but
+  // don't register the magic-link provider until the adapter lands.
+  if (process.env["RESEND_API_KEY"] && process.env["AUTH_RESEND_ENABLED"] === "true") {
     providers.push(
       Resend({
         apiKey: process.env["RESEND_API_KEY"],

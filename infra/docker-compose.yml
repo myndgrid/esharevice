@@ -76,6 +76,16 @@ services:
       # Public URL used to build clickable links in emails.
       WEB_PUBLIC_URL: ${WEB_PUBLIC_URL:-https://${DOMAIN}}
       SENTRY_DSN: ${SENTRY_DSN_API:-}
+      # Feature flags — default off so a half-migrated env doesn't expose
+      # half-baked endpoints. Flip to "true" in infra/.env once the
+      # corresponding schema migrations + downstream wiring have landed.
+      FEATURE_LISTING_TYPES: ${FEATURE_LISTING_TYPES:-false}
+      FEATURE_BOOKINGS: ${FEATURE_BOOKINGS:-false}
+      FEATURE_STRIPE: ${FEATURE_STRIPE:-false}
+      # Stripe API + webhook secrets — only consumed when FEATURE_STRIPE=true.
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_ACCOUNT_COUNTRY: ${STRIPE_ACCOUNT_COUNTRY:-CA}
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
